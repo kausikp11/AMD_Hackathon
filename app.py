@@ -16,6 +16,13 @@ FRAMES = [
     for line in (DATA_ROOT / "frames.txt").read_text().splitlines()
     if line.strip()
 ]
+DEMO_FRAME_COUNT = int(
+    os.getenv(
+        "DEMO_FRAME_COUNT",
+        "10"
+    )
+)
+DEMO_FRAMES = FRAMES[:DEMO_FRAME_COUNT]
 DATA_ROOT_ABS = DATA_ROOT.resolve()
 
 
@@ -311,7 +318,7 @@ def clamp_index(index):
         0,
         min(
             int(index),
-            len(FRAMES) - 1
+            len(DEMO_FRAMES) - 1
         )
     )
 
@@ -319,7 +326,7 @@ def clamp_index(index):
 def frame_index(frame_id):
 
     try:
-        return FRAMES.index(
+        return DEMO_FRAMES.index(
             frame_id
         )
     except ValueError:
@@ -332,7 +339,7 @@ def analyze_index(index):
         index
     )
 
-    frame_id = FRAMES[index]
+    frame_id = DEMO_FRAMES[index]
     result = run_pipeline(
         frame_id
     )
@@ -378,11 +385,19 @@ def analyze_index(index):
         scene
     )
 
+    robot_command = robot_command_text(
+        world,
+        decision,
+        plan,
+        scene
+    )
+
     return (
         index,
         index,
         frame_id,
         status,
+        robot_command,
         rgb,
         thermal,
         json.dumps(
@@ -623,7 +638,7 @@ def demo_status(
     )
 
     return (
-        f"Frame {index + 1}/{len(FRAMES)} | "
+        f"Frame {index + 1}/{len(DEMO_FRAMES)} | "
         f"ID {frame_id} | "
         f"Risk {decision['risk_level']} | "
         f"Action {plan['action']} | "
@@ -631,6 +646,90 @@ def demo_status(
         f"Distance {distance_text} | "
         f"Scene {scene.get('scene_source', 'unknown')}"
     )
+
+
+def robot_command_text(world, decision, plan, scene):
+
+    action = plan["action"]
+    human = world["human"]
+    located = scene.get(
+        "located_objects",
+        []
+    )
+
+    if action == "STOP":
+        command = "STOPPING"
+        steering = "hold position"
+    elif action == "SLOW_DOWN":
+        command = "SLOWING DOWN"
+        steering = steering_from_human_box(
+            located
+        )
+    elif action == "PROCEED_WITH_CAUTION":
+        command = "CAUTIOUS FORWARD"
+        steering = steering_from_human_box(
+            located
+        )
+    else:
+        command = "MOVING FORWARD"
+        steering = "center aisle"
+
+    if human["present"] and action != "STOP":
+        steering = steering_from_human_box(
+            located
+        )
+
+    return (
+        "Decision source: rule-based control algorithm\n"
+        f"Scene source: {scene.get('scene_source', 'unknown')}\n"
+        f"Command: {command}\n"
+        f"Steering: {steering}\n"
+        f"Target speed: {plan['target_speed']}\n"
+        f"Risk: {decision['risk_level']}\n"
+        f"Reason: {decision['reasoning']}"
+    )
+
+
+def steering_from_human_box(located_objects):
+
+    for obj in located_objects:
+
+        if obj.get("label") != "human":
+            continue
+
+        bbox = obj.get(
+            "bbox",
+            {}
+        )
+
+        if "cx" in bbox:
+            cx = float(
+                bbox["cx"]
+            )
+        elif "x1" in bbox and "x2" in bbox:
+            cx = (
+                float(
+                    bbox["x1"]
+                )
+                +
+                float(
+                    bbox["x2"]
+                )
+            ) / 2
+            if cx > 1:
+                return "turn left around obstacle"
+        else:
+            continue
+
+        if cx > 0.58:
+            return "turn left around human"
+
+        if cx < 0.42:
+            return "turn right around human"
+
+        return "slow center approach"
+
+    return "center aisle"
 
 
 def analyze_frame_id(frame_id):
@@ -646,7 +745,7 @@ def next_frame(index):
 
     return analyze_index(
         (clamp_index(index) + 1)
-        % len(FRAMES)
+        % len(DEMO_FRAMES)
     )
 
 
@@ -654,7 +753,7 @@ def previous_frame(index):
 
     return analyze_index(
         (clamp_index(index) - 1)
-        % len(FRAMES)
+        % len(DEMO_FRAMES)
     )
 
 
@@ -699,16 +798,26 @@ with gr.Blocks() as demo:
         "# Industrial Robot Copilot"
     )
 
-    gr.HTML(
-        live_stream_html()
-    )
-
     gr.Markdown(
-        "Use the live stream above for motion. Use the controls below to inspect one frame through the robot copilot pipeline."
+        "Live 10-frame demo loop. Bounding boxes are drawn from the active locator backend. Robot command is produced by the control algorithm; scene understanding is produced by Qwen when enabled."
     )
 
     frame_index_state = gr.State(
         value=0
+    )
+
+    playing_state = gr.State(
+        value=True
+    )
+
+    playback_timer = gr.Timer(
+        value=float(
+            os.getenv(
+                "DEMO_SECONDS_PER_FRAME",
+                "0.1"
+            )
+        ),
+        active=True
     )
 
     status_box = gr.Textbox(
@@ -716,18 +825,24 @@ with gr.Blocks() as demo:
         interactive=False
     )
 
+    command_box = gr.Textbox(
+        label="Robot Command / Decision Source",
+        lines=6,
+        interactive=False
+    )
+
     with gr.Row():
 
         frame_id = gr.Dropdown(
-            choices=FRAMES,
-            value=FRAMES[0],
+            choices=DEMO_FRAMES,
+            value=DEMO_FRAMES[0],
             label="Frame ID",
             scale=2
         )
 
         frame_slider = gr.Slider(
             minimum=0,
-            maximum=len(FRAMES) - 1,
+            maximum=len(DEMO_FRAMES) - 1,
             value=0,
             step=1,
             label="Timeline",
@@ -748,14 +863,22 @@ with gr.Blocks() as demo:
             "Next"
         )
 
+        play_btn = gr.Button(
+            "Play"
+        )
+
+        pause_btn = gr.Button(
+            "Pause"
+        )
+
     with gr.Row():
 
         rgb_image = gr.Image(
-            label="RGB"
+            label="RGB With Boxes"
         )
 
         thermal_image = gr.Image(
-            label="Thermal"
+            label="Thermal With Boxes"
         )
 
     world_box = gr.Textbox(
@@ -788,6 +911,7 @@ with gr.Blocks() as demo:
         frame_slider,
         frame_id,
         status_box,
+        command_box,
         rgb_image,
         thermal_image,
         world_box,
@@ -841,6 +965,39 @@ with gr.Blocks() as demo:
         next_frame,
         inputs=[
             frame_index_state
+        ],
+        outputs=OUTPUTS
+    )
+
+    play_btn.click(
+        set_playing,
+        inputs=[
+            gr.State(
+                value=True
+            )
+        ],
+        outputs=[
+            playing_state
+        ]
+    )
+
+    pause_btn.click(
+        set_playing,
+        inputs=[
+            gr.State(
+                value=False
+            )
+        ],
+        outputs=[
+            playing_state
+        ]
+    )
+
+    playback_timer.tick(
+        timer_tick,
+        inputs=[
+            frame_index_state,
+            playing_state
         ],
         outputs=OUTPUTS
     )

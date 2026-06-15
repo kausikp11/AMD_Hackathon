@@ -11,9 +11,9 @@ Multimodal industrial robot copilot prototype using RGB labels/images, thermal l
 
 Open the URL printed by `start.sh`, usually `http://localhost:7860`.
 
-The top live stream animates RGB and thermal frames in the browser at 20 FPS.
-The lower controls inspect one selected frame through the full copilot pipeline,
-including Qwen when the Qwen endpoint is running.
+The dashboard loops over the first 10 frames by default and updates the boxed
+RGB/thermal views, robot command, world state, risk decision, scene, plan, and
+explanation together. Change the loop length with `DEMO_FRAME_COUNT`.
 
 ## Smoke Tests
 
@@ -106,6 +106,12 @@ Bounding boxes from GroundingDINO appear on inspected RGB frames with `DINO`
 labels. Qwen boxes appear with `Qwen` labels when Qwen returns approximate
 `located_objects`; dataset RGB/thermal label boxes are always available in
 `LOCATOR_BACKEND=labels`.
+
+GroundingDINO is prompted for the tracked industrial objects: human,
+industrial machine, workbench, pipe, cabinet, storage box, control panel,
+forklift, and robot. The robot command panel labels its source separately:
+scene output comes from Qwen/heuristics, while command/steering comes from the
+rule-based control algorithm.
 
 ## Useful Files
 
