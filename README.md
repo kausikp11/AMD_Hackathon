@@ -11,9 +11,10 @@ Multimodal industrial robot copilot prototype using RGB labels/images, thermal l
 
 Open the URL printed by `start.sh`, usually `http://localhost:7860`.
 
-The dashboard loops over the first 10 frames by default and updates the boxed
+The top stream plays all frames as a browser-side canvas stream. The lower controls
+inspect one selected frame through the full copilot pipeline, including boxed
 RGB/thermal views, robot command, world state, risk decision, scene, plan, and
-explanation together. Change the loop length with `DEMO_FRAME_COUNT`.
+explanation. Limit the stream/selector with `DEMO_FRAME_COUNT=10` if needed.
 
 ## Smoke Tests
 

@@ -16,13 +16,15 @@ FRAMES = [
     for line in (DATA_ROOT / "frames.txt").read_text().splitlines()
     if line.strip()
 ]
-DEMO_FRAME_COUNT = int(
-    os.getenv(
-        "DEMO_FRAME_COUNT",
-        "10"
-    )
+DEMO_FRAME_COUNT = os.getenv(
+    "DEMO_FRAME_COUNT",
+    "all"
 )
-DEMO_FRAMES = FRAMES[:DEMO_FRAME_COUNT]
+DEMO_FRAMES = (
+    FRAMES
+    if DEMO_FRAME_COUNT.lower() in {"all", "0", ""}
+    else FRAMES[:int(DEMO_FRAME_COUNT)]
+)
 DATA_ROOT_ABS = DATA_ROOT.resolve()
 
 
@@ -54,7 +56,7 @@ def frame_media():
 
     media = []
 
-    for frame_id in FRAMES:
+    for frame_id in DEMO_FRAMES:
 
         rgb_path = find_image(
             "05_rgb",
@@ -133,7 +135,7 @@ def live_stream_html():
   }}
   .grid {{
     display: grid;
-    grid-template-columns: 1fr 1fr 0.85fr;
+    grid-template-columns: 1fr 1fr;
     gap: 1px;
     background: #2a333d;
   }}
@@ -143,10 +145,9 @@ def live_stream_html():
     height: 430px;
     overflow: hidden;
   }}
-  .panel img {{
+  .panel canvas {{
     width: 100%;
     height: 100%;
-    object-fit: contain;
     display: block;
   }}
   .tag {{
@@ -156,51 +157,6 @@ def live_stream_html():
     background: rgba(0, 0, 0, 0.65);
     padding: 4px 8px;
     font-size: 13px;
-  }}
-  .map {{
-    position: relative;
-    height: 430px;
-    background:
-      linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px),
-      linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-      #0d1418;
-    background-size: 48px 48px;
-    overflow: hidden;
-  }}
-  .aisle {{
-    position: absolute;
-    left: 42%;
-    top: 6%;
-    width: 16%;
-    height: 88%;
-    background: rgba(86, 180, 233, 0.16);
-    border: 1px solid rgba(86, 180, 233, 0.35);
-  }}
-  .machine {{
-    position: absolute;
-    width: 23%;
-    height: 18%;
-    background: rgba(230, 159, 0, 0.28);
-    border: 1px solid rgba(230, 159, 0, 0.6);
-  }}
-  .robot {{
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #00cc88;
-    border: 3px solid #eafff7;
-    box-shadow: 0 0 18px rgba(0, 204, 136, 0.75);
-    transform: translate(-50%, -50%);
-    transition: left 45ms linear, top 45ms linear;
-  }}
-  .path {{
-    position: absolute;
-    left: 49%;
-    top: 10%;
-    width: 2%;
-    height: 80%;
-    background: rgba(0, 204, 136, 0.28);
   }}
 </style>
 </head>
@@ -217,58 +173,94 @@ def live_stream_html():
   <div class="grid">
     <div class="panel">
       <div class="tag">RGB</div>
-      <img id="rgb" alt="RGB stream">
+      <canvas id="rgb"></canvas>
     </div>
     <div class="panel">
       <div class="tag">Thermal</div>
-      <img id="thermal" alt="Thermal stream">
-    </div>
-    <div class="map">
-      <div class="tag">Robot Movement</div>
-      <div class="aisle"></div>
-      <div class="path"></div>
-      <div class="machine" style="left:8%; top:12%;"></div>
-      <div class="machine" style="right:8%; top:26%;"></div>
-      <div class="machine" style="left:10%; bottom:12%;"></div>
-      <div class="machine" style="right:9%; bottom:16%;"></div>
-      <div id="robot" class="robot"></div>
+      <canvas id="thermal"></canvas>
     </div>
   </div>
   <script>
     const frames = {media_json};
     let index = 0;
-    let timer = null;
+    let playing = true;
+    let lastFrameTime = 0;
+    const cache = new Map();
 
-    const rgb = document.getElementById("rgb");
-    const thermal = document.getElementById("thermal");
-    const robot = document.getElementById("robot");
+    const rgbCanvas = document.getElementById("rgb");
+    const thermalCanvas = document.getElementById("thermal");
+    const rgbCtx = rgbCanvas.getContext("2d");
+    const thermalCtx = thermalCanvas.getContext("2d");
     const status = document.getElementById("status");
     const timeline = document.getElementById("timeline");
     const fpsInput = document.getElementById("fps");
 
     timeline.max = Math.max(frames.length - 1, 0);
 
+    function resizeCanvas(canvas) {{
+      const rect = canvas.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.floor(rect.width * scale));
+      const height = Math.max(1, Math.floor(rect.height * scale));
+      if (canvas.width !== width || canvas.height !== height) {{
+        canvas.width = width;
+        canvas.height = height;
+      }}
+    }}
+
+    function loadImage(url) {{
+      if (cache.has(url)) return cache.get(url);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+      cache.set(url, img);
+      return img;
+    }}
+
+    function preloadAround(i) {{
+      for (let offset = 0; offset < 8; offset++) {{
+        const frame = frames[(i + offset) % frames.length];
+        loadImage(frame.rgb);
+        loadImage(frame.thermal);
+      }}
+    }}
+
+    function drawContain(ctx, canvas, img) {{
+      resizeCanvas(canvas);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#050608";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!img.complete || !img.naturalWidth) return;
+
+      const scale = Math.min(
+        canvas.width / img.naturalWidth,
+        canvas.height / img.naturalHeight
+      );
+      const width = img.naturalWidth * scale;
+      const height = img.naturalHeight * scale;
+      const x = (canvas.width - width) / 2;
+      const y = (canvas.height - height) / 2;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(img, x, y, width, height);
+    }}
+
     function show(i) {{
       if (!frames.length) return;
       index = (i + frames.length) % frames.length;
       const frame = frames[index];
-      rgb.src = frame.rgb;
-      thermal.src = frame.thermal;
-      timeline.value = index;
-      status.textContent = `Frame ${{index + 1}}/${{frames.length}} | ID ${{frame.id}}`;
-      const phase = frames.length > 1 ? index / (frames.length - 1) : 0;
-      const y = 12 + phase * 76;
-      const x = 50 + Math.sin(phase * Math.PI * 4) * 5;
-      robot.style.left = `${{x}}%`;
-      robot.style.top = `${{y}}%`;
+      const rgb = loadImage(frame.rgb);
+      const thermal = loadImage(frame.thermal);
 
-      const next = frames[(index + 1) % frames.length];
-      if (next) {{
-        const preloadRgb = new Image();
-        const preloadThermal = new Image();
-        preloadRgb.src = next.rgb;
-        preloadThermal.src = next.thermal;
-      }}
+      drawContain(rgbCtx, rgbCanvas, rgb);
+      drawContain(thermalCtx, thermalCanvas, thermal);
+
+      if (!rgb.complete) rgb.onload = () => drawContain(rgbCtx, rgbCanvas, rgb);
+      if (!thermal.complete) thermal.onload = () => drawContain(thermalCtx, thermalCanvas, thermal);
+
+      timeline.value = index;
+      status.textContent = `Realtime stream | Frame ${{index + 1}}/${{frames.length}} | ID ${{frame.id}}`;
+      preloadAround(index + 1);
     }}
 
     function intervalMs() {{
@@ -277,26 +269,30 @@ def live_stream_html():
     }}
 
     function play() {{
-      pause();
-      timer = setInterval(() => show(index + 1), intervalMs());
+      playing = true;
     }}
 
     function pause() {{
-      if (timer) clearInterval(timer);
-      timer = null;
+      playing = false;
+    }}
+
+    function loop(timestamp) {{
+      if (playing && timestamp - lastFrameTime >= intervalMs()) {{
+        show(index + 1);
+        lastFrameTime = timestamp;
+      }}
+      requestAnimationFrame(loop);
     }}
 
     document.getElementById("play").onclick = play;
     document.getElementById("pause").onclick = pause;
     document.getElementById("prev").onclick = () => show(index - 1);
     document.getElementById("next").onclick = () => show(index + 1);
-    fpsInput.onchange = () => {{
-      if (timer) play();
-    }};
     timeline.oninput = () => show(Number(timeline.value));
+    window.onresize = () => show(index);
 
     show(0);
-    play();
+    requestAnimationFrame(loop);
   </script>
 </body>
 </html>
@@ -597,7 +593,13 @@ def source_color(source):
     if source == "thermal":
         return (213, 94, 0)
 
+    if source == "thermal_fallback":
+        return (213, 94, 0)
+
     if source == "rgb":
+        return (240, 228, 66)
+
+    if source == "rgb_fallback":
         return (240, 228, 66)
 
     return (204, 121, 167)
@@ -609,7 +611,9 @@ def source_label(source):
         "grounding_dino": "DINO",
         "qwen_vlm": "Qwen",
         "rgb": "RGB label",
+        "rgb_fallback": "RGB fallback",
         "thermal": "Thermal label",
+        "thermal_fallback": "Thermal fallback",
         "nvidia_locateanything_transformers": "LocateAnything",
         "nvidia_locateanything_vllm": "LocateAnything"
     }
@@ -764,31 +768,6 @@ def jump_to_index(index):
     )
 
 
-def timer_tick(index, playing):
-
-    if not playing:
-        return analyze_index(
-            index
-        )
-
-    return next_frame(
-        index
-    )
-
-
-def set_playing(value):
-
-    return value
-
-
-def timer_interval(speed):
-
-    return gr.Timer(
-        value=float(speed),
-        active=True
-    )
-
-
 OUTPUTS = []
 
 
@@ -798,26 +777,16 @@ with gr.Blocks() as demo:
         "# Industrial Robot Copilot"
     )
 
+    gr.HTML(
+        live_stream_html()
+    )
+
     gr.Markdown(
-        "Live 10-frame demo loop. Bounding boxes are drawn from the active locator backend. Robot command is produced by the control algorithm; scene understanding is produced by Qwen when enabled."
+        "The top stream plays the dataset smoothly in the browser. Use the controls below to inspect one frame with bounding boxes, Qwen scene output, and control decisions."
     )
 
     frame_index_state = gr.State(
         value=0
-    )
-
-    playing_state = gr.State(
-        value=True
-    )
-
-    playback_timer = gr.Timer(
-        value=float(
-            os.getenv(
-                "DEMO_SECONDS_PER_FRAME",
-                "0.1"
-            )
-        ),
-        active=True
     )
 
     status_box = gr.Textbox(
@@ -861,14 +830,6 @@ with gr.Blocks() as demo:
 
         next_btn = gr.Button(
             "Next"
-        )
-
-        play_btn = gr.Button(
-            "Play"
-        )
-
-        pause_btn = gr.Button(
-            "Pause"
         )
 
     with gr.Row():
@@ -969,39 +930,6 @@ with gr.Blocks() as demo:
         outputs=OUTPUTS
     )
 
-    play_btn.click(
-        set_playing,
-        inputs=[
-            gr.State(
-                value=True
-            )
-        ],
-        outputs=[
-            playing_state
-        ]
-    )
-
-    pause_btn.click(
-        set_playing,
-        inputs=[
-            gr.State(
-                value=False
-            )
-        ],
-        outputs=[
-            playing_state
-        ]
-    )
-
-    playback_timer.tick(
-        timer_tick,
-        inputs=[
-            frame_index_state,
-            playing_state
-        ],
-        outputs=OUTPUTS
-    )
-
 
 demo.launch(
     server_name=os.getenv(
@@ -1016,5 +944,9 @@ demo.launch(
     ),
     allowed_paths=[
         str(DATA_ROOT_ABS)
-    ], share=True
+    ],
+    share=os.getenv(
+        "GRADIO_SHARE",
+        "0"
+    ) == "1"
 )

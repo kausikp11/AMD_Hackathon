@@ -43,10 +43,20 @@ def locate_objects(frame, object_names=None):
     names = object_names or DEFAULT_OBJECTS
 
     if backend == "grounding_dino":
-        return locate_with_grounding_dino(
-            frame,
-            names
-        )
+        try:
+            return locate_with_grounding_dino(
+                frame,
+                names
+            )
+        except Exception as exc:
+            return mark_fallback(
+                locate_from_labels(
+                    frame,
+                    names
+                ),
+                "grounding_dino",
+                exc
+            )
 
     if backend == "nvidia_vllm":
         return locate_with_nvidia_vllm(
@@ -67,6 +77,14 @@ def locate_objects(frame, object_names=None):
         )
 
     if backend == "auto":
+        try:
+            return locate_with_grounding_dino(
+                frame,
+                names
+            )
+        except Exception:
+            pass
+
         try:
             return locate_with_nvidia(
                 frame,
@@ -326,10 +344,37 @@ def locate_with_grounding_dino(frame, object_names=None):
     return located
 
 
+def mark_fallback(detections, requested_backend, exc):
+
+    reason = (
+        f"{type(exc).__name__}: {exc}"
+    )
+
+    for det in detections:
+        det["requested_backend"] = requested_backend
+        det["fallback_reason"] = reason
+        det["source"] = (
+            det.get(
+                "source",
+                "labels"
+            )
+            + "_fallback"
+        )
+
+    return detections
+
+
 @lru_cache(maxsize=1)
 def get_grounding_dino_detector():
 
-    from transformers import pipeline
+    try:
+        from transformers import pipeline
+    except Exception as exc:
+        raise RuntimeError(
+            "GroundingDINO backend requires a Transformers install with "
+            "`pipeline` support. Use LOCATOR_BACKEND=labels for the stable "
+            "demo, or fix the Transformers environment."
+        ) from exc
 
     kwargs = {
         "task":
