@@ -18,7 +18,7 @@ FRAMES = [
 ]
 DEMO_FRAME_COUNT = os.getenv(
     "DEMO_FRAME_COUNT",
-    "all"
+    "10"
 )
 DEMO_FRAMES = (
     FRAMES
@@ -471,6 +471,31 @@ def analyze_index(index):
     )
 
 
+def error_outputs(index, message):
+
+    index = clamp_index(
+        index
+    )
+    frame_id = DEMO_FRAMES[index]
+
+    return (
+        index,
+        index,
+        frame_id,
+        f"Frame {index + 1}/{len(DEMO_FRAMES)} | ID {frame_id} | ERROR",
+        "Decision source: unavailable\n"
+        "Scene source: unavailable\n"
+        f"Reason: {message}",
+        None,
+        None,
+        "",
+        "",
+        "",
+        "",
+        message
+    )
+
+
 def draw_detections(image, detections, target):
 
     output = image.copy()
@@ -823,27 +848,30 @@ def jump_to_index(index):
     )
 
 
-OUTPUT_COUNT = 12
+def play_model_synced(index):
 
-
-def set_model_loop(value):
-
-    return value
-
-
-def model_loop_tick(index, playing):
-
-    if not playing:
-        return tuple(
-            gr.skip()
-            for _ in range(
-                OUTPUT_COUNT
-            )
-        )
-
-    return next_frame(
+    start = clamp_index(
         index
     )
+
+    for offset in range(
+        len(DEMO_FRAMES)
+    ):
+
+        current = (
+            start
+            + offset
+        ) % len(DEMO_FRAMES)
+
+        try:
+            yield analyze_index(
+                current
+            )
+        except Exception as exc:
+            yield error_outputs(
+                current,
+                f"{type(exc).__name__}: {exc}"
+            )
 
 
 OUTPUTS = []
@@ -865,20 +893,6 @@ with gr.Blocks() as demo:
 
     frame_index_state = gr.State(
         value=0
-    )
-
-    model_loop_state = gr.State(
-        value=False
-    )
-
-    model_loop_timer = gr.Timer(
-        value=float(
-            os.getenv(
-                "MODEL_LOOP_SECONDS",
-                "0.25"
-            )
-        ),
-        active=True
     )
 
     status_box = gr.Textbox(
@@ -929,7 +943,7 @@ with gr.Blocks() as demo:
         )
 
         model_pause_btn = gr.Button(
-            "Pause Model-Synced"
+            "Stop Model-Synced"
         )
 
     with gr.Row():
@@ -1030,37 +1044,21 @@ with gr.Blocks() as demo:
         outputs=OUTPUTS
     )
 
-    model_play_btn.click(
-        set_model_loop,
+    model_play_event = model_play_btn.click(
+        play_model_synced,
         inputs=[
-            gr.State(
-                value=True
-            )
+            frame_index_state
         ],
-        outputs=[
-            model_loop_state
-        ]
+        outputs=OUTPUTS
     )
 
     model_pause_btn.click(
-        set_model_loop,
-        inputs=[
-            gr.State(
-                value=False
-            )
-        ],
-        outputs=[
-            model_loop_state
+        None,
+        None,
+        None,
+        cancels=[
+            model_play_event
         ]
-    )
-
-    model_loop_timer.tick(
-        model_loop_tick,
-        inputs=[
-            frame_index_state,
-            model_loop_state
-        ],
-        outputs=OUTPUTS
     )
 
 

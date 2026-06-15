@@ -59,7 +59,8 @@ class QwenVLM:
                     "role": "system",
                     "content": (
                         "You are an industrial robot scene understanding "
-                        "model. Return only valid JSON."
+                        "model. Return only valid JSON. Do not return "
+                        "markdown, comments, or explanatory text."
                     )
                 },
                 {
@@ -84,8 +85,18 @@ class QwenVLM:
 
         content = response.choices[0].message.content
 
+        try:
+            scene = parse_json_response(
+                content
+            )
+        except json.JSONDecodeError as exc:
+            return fallback_scene(
+                content,
+                exc
+            )
+
         return normalize_scene_json(
-            parse_json_response(content)
+            scene
         )
 
 
@@ -154,7 +165,9 @@ carts, cabinets, boxes, forklifts, pipes, obstacles, and navigable aisles.
 If you can estimate object boxes, include them in located_objects using pixel
 coordinates relative to the input image. If boxes are uncertain, return an
 empty located_objects list.
-Return only JSON.
+Return only a single valid JSON object. Use double quotes for every key and
+string. Do not include markdown fences, bullets, comments, or text before or
+after the JSON object.
 """
     ).strip()
 
@@ -181,6 +194,42 @@ def parse_json_response(content):
         return json.loads(
             text[start:end + 1]
         )
+
+
+def fallback_scene(content, error):
+
+    return normalize_scene_json({
+        "environment_type":
+            "unknown",
+
+        "objects":
+            [],
+
+        "hazards":
+            [
+                "qwen_json_parse_error"
+            ],
+
+        "navigation": {
+            "aisle_detected":
+                False,
+            "walkable_region":
+                "unknown",
+            "obstacle_regions":
+                []
+        },
+
+        "located_objects":
+            [],
+
+        "parse_error":
+            str(
+                error
+            ),
+
+        "raw_response_preview":
+            content[:300]
+    })
 
 
 def normalize_scene_json(scene):
@@ -243,6 +292,16 @@ def normalize_scene_json(scene):
                     "located_objects",
                     []
                 )
+            ),
+
+        "parse_error":
+            scene.get(
+                "parse_error"
+            ),
+
+        "raw_response_preview":
+            scene.get(
+                "raw_response_preview"
             )
     }
 
