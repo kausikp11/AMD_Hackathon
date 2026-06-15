@@ -115,11 +115,21 @@ Return JSON with this exact shape:
     "aisle_detected": true,
     "walkable_region": "center|left|right|unknown",
     "obstacle_regions": ["left", "right"]
-  }
+  },
+  "located_objects": [
+    {
+      "label": "human",
+      "bbox": {"x1": 10, "y1": 20, "x2": 100, "y2": 180},
+      "confidence": 0.8
+    }
+  ]
 }
 
 Use snake_case labels. Focus on humans, robots, machines, workbenches,
 carts, cabinets, boxes, forklifts, pipes, obstacles, and navigable aisles.
+If you can estimate object boxes, include them in located_objects using pixel
+coordinates relative to the input image. If boxes are uncertain, return an
+empty located_objects list.
 Return only JSON.
 """.strip()
 
@@ -200,7 +210,15 @@ def normalize_scene_json(scene):
                         []
                     )
                 )
-        }
+        },
+
+        "located_objects":
+            normalize_located_objects(
+                scene.get(
+                    "located_objects",
+                    []
+                )
+            )
     }
 
 
@@ -241,6 +259,58 @@ def normalize_objects(objects):
                         1
                     )
                 )
+        })
+
+    return normalized
+
+
+def normalize_located_objects(objects):
+
+    normalized = []
+
+    for obj in objects:
+
+        if not isinstance(obj, dict):
+            continue
+
+        bbox = obj.get(
+            "bbox"
+        )
+
+        if not bbox:
+            continue
+
+        normalized.append({
+            "label":
+                obj.get(
+                    "label",
+                    "unknown"
+                ).replace(
+                    " ",
+                    "_"
+                ),
+
+            "bbox":
+                bbox,
+
+            "distance":
+                obj.get(
+                    "distance"
+                ),
+
+            "confidence":
+                float(
+                    obj.get(
+                        "confidence",
+                        obj.get(
+                            "score",
+                            1.0
+                        )
+                    )
+                ),
+
+            "source":
+                "qwen_vlm"
         })
 
     return normalized

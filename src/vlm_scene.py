@@ -203,8 +203,22 @@ def describe_scene(frame, world):
         frame
     )
 
-    detected_objects = build_detected_objects(
+    qwen_located_objects = (
+        vlm_scene.get(
+            "located_objects",
+            []
+        )
+        if vlm_scene
+        else []
+    )
+
+    all_located_objects = (
         located_objects
+        + qwen_located_objects
+    )
+
+    detected_objects = build_detected_objects(
+        all_located_objects
     )
 
     inventory = (
@@ -251,7 +265,7 @@ def describe_scene(frame, world):
             ),
 
         "located_objects":
-            located_objects,
+            all_located_objects,
 
         "scene_source":
             "qwen_vlm"

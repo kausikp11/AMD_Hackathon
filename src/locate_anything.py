@@ -28,6 +28,7 @@ def locate_objects(frame, object_names=None):
 
     Backends:
     - labels: use dataset RGB/thermal labels.
+    - grounding_dino: use Hugging Face zero-shot object detection.
     - nvidia_vllm: call nvidia/LocateAnything-3B through vLLM/OpenAI API.
     - nvidia_transformers: load nvidia/LocateAnything-3B locally from HF.
     - nvidia: use vLLM if configured, otherwise local Transformers.
@@ -40,6 +41,12 @@ def locate_objects(frame, object_names=None):
     ).lower()
 
     names = object_names or DEFAULT_OBJECTS
+
+    if backend == "grounding_dino":
+        return locate_with_grounding_dino(
+            frame,
+            names
+        )
 
     if backend == "nvidia_vllm":
         return locate_with_nvidia_vllm(
@@ -225,6 +232,127 @@ def locate_with_nvidia_transformers(frame, object_names=None):
     return located
 
 
+def locate_with_grounding_dino(frame, object_names=None):
+
+    image_path = require_rgb_image(
+        frame
+    )
+
+    image = Image.open(
+        image_path
+    ).convert("RGB")
+
+    detector = get_grounding_dino_detector()
+
+    threshold = float(
+        os.getenv(
+            "GROUNDING_DINO_THRESHOLD",
+            "0.30"
+        )
+    )
+
+    results = detector(
+        image,
+        candidate_labels=list(
+            object_names or DEFAULT_OBJECTS
+        ),
+        threshold=threshold
+    )
+
+    located = []
+
+    for result in results:
+
+        box = result.get(
+            "box",
+            {}
+        )
+
+        located.append({
+            "label":
+                normalize_label(
+                    result.get(
+                        "label",
+                        "unknown"
+                    )
+                ),
+
+            "bbox": {
+                "x1":
+                    float(
+                        box.get(
+                            "xmin",
+                            0
+                        )
+                    ),
+                "y1":
+                    float(
+                        box.get(
+                            "ymin",
+                            0
+                        )
+                    ),
+                "x2":
+                    float(
+                        box.get(
+                            "xmax",
+                            0
+                        )
+                    ),
+                "y2":
+                    float(
+                        box.get(
+                            "ymax",
+                            0
+                        )
+                    )
+            },
+
+            "distance":
+                None,
+
+            "confidence":
+                float(
+                    result.get(
+                        "score",
+                        1.0
+                    )
+                ),
+
+            "source":
+                "grounding_dino"
+        })
+
+    return located
+
+
+@lru_cache(maxsize=1)
+def get_grounding_dino_detector():
+
+    from transformers import pipeline
+
+    kwargs = {
+        "task":
+            "zero-shot-object-detection",
+        "model":
+            os.getenv(
+                "GROUNDING_DINO_MODEL",
+                "IDEA-Research/grounding-dino-tiny"
+            )
+    }
+
+    device = os.getenv(
+        "GROUNDING_DINO_DEVICE"
+    )
+
+    if device:
+        kwargs["device"] = device
+
+    return pipeline(
+        **kwargs
+    )
+
+
 @lru_cache(maxsize=1)
 def get_transformers_worker():
 
@@ -271,7 +399,14 @@ def get_transformers_worker():
         torch_dtype=dtype,
         trust_remote_code=True,
         attn_implementation=attn_implementation
-    ).to(device).eval()
+    )
+
+    force_attention_implementation(
+        model,
+        attn_implementation
+    )
+
+    model = model.to(device).eval()
 
     return LocateAnythingWorker(
         model,
@@ -280,6 +415,62 @@ def get_transformers_worker():
         device,
         dtype
     )
+
+
+def force_attention_implementation(model, attn_implementation):
+
+    for obj in attention_targets(model):
+
+        if hasattr(obj, "_attn_implementation"):
+            setattr(
+                obj,
+                "_attn_implementation",
+                attn_implementation
+            )
+
+        if hasattr(obj, "attn_implementation"):
+            setattr(
+                obj,
+                "attn_implementation",
+                attn_implementation
+            )
+
+
+def attention_targets(model):
+
+    targets = [
+        model
+    ]
+
+    for attr in [
+        "config",
+        "language_model",
+        "vision_model",
+        "model"
+    ]:
+
+        if hasattr(model, attr):
+            targets.append(
+                getattr(
+                    model,
+                    attr
+                )
+            )
+
+    if hasattr(model, "modules"):
+        targets.extend(
+            list(
+                model.modules()
+            )
+        )
+
+    for target in list(targets):
+        if hasattr(target, "config"):
+            targets.append(
+                target.config
+            )
+
+    return targets
 
 
 class LocateAnythingWorker:

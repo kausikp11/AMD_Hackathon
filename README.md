@@ -11,6 +11,10 @@ Multimodal industrial robot copilot prototype using RGB labels/images, thermal l
 
 Open the URL printed by `start.sh`, usually `http://localhost:7860`.
 
+The top live stream animates RGB and thermal frames in the browser at 20 FPS.
+The lower controls inspect one selected frame through the full copilot pipeline,
+including Qwen when the Qwen endpoint is running.
+
 ## Smoke Tests
 
 Run the default five-frame check:
@@ -85,6 +89,23 @@ LOCATOR_BACKEND=nvidia_transformers \
 NVIDIA_LOCATE_ANYTHING_ATTN_IMPLEMENTATION=sdpa \
 ./start.sh
 ```
+
+## GroundingDINO Localization
+
+GroundingDINO can be used as a LocateAnything-style open-vocabulary locator:
+
+```bash
+VLM_BACKEND=qwen \
+QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
+LOCATOR_BACKEND=grounding_dino \
+GROUNDING_DINO_MODEL=IDEA-Research/grounding-dino-tiny \
+./start.sh
+```
+
+Bounding boxes from GroundingDINO appear on inspected RGB frames with `DINO`
+labels. Qwen boxes appear with `Qwen` labels when Qwen returns approximate
+`located_objects`; dataset RGB/thermal label boxes are always available in
+`LOCATOR_BACKEND=labels`.
 
 ## Useful Files
 
