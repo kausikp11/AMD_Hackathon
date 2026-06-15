@@ -39,16 +39,25 @@ This uses the deterministic local pipeline and dataset RGB/thermal labels. It is
 
 ## Qwen VLM On AMD
 
-Serve Qwen on the AMD resource using a ROCm-compatible OpenAI/vLLM endpoint, then run:
+Serve Qwen on the AMD resource using the helper:
 
 ```bash
-VLM_BACKEND=qwen \
-QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
-QWEN_VLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct \
+./scripts/start_qwen_vllm.sh
+```
+
+Then run the app in another terminal:
+
+```bash
 ./start.sh
 ```
 
-The app will use Qwen for scene understanding and keep the rest of the robotics pipeline local.
+`start.sh` checks `http://localhost:8000/v1/models`; if Qwen is available it uses `VLM_BACKEND=qwen`, otherwise it falls back to the heuristic scene backend. Localization remains label-based unless changed.
+
+Manual Qwen app mode:
+
+```bash
+VLM_BACKEND=qwen QWEN_VLM_BASE_URL=http://localhost:8000/v1 LOCATOR_BACKEND=labels ./start.sh
+```
 
 ## LocateAnything
 
@@ -72,7 +81,9 @@ NVIDIA_LOCATE_ANYTHING_MODEL=nvidia/LocateAnything-3B \
 If local Transformers inference is validated:
 
 ```bash
-LOCATOR_BACKEND=nvidia_transformers ./start.sh
+LOCATOR_BACKEND=nvidia_transformers \
+NVIDIA_LOCATE_ANYTHING_ATTN_IMPLEMENTATION=sdpa \
+./start.sh
 ```
 
 ## Useful Files
@@ -84,4 +95,3 @@ LOCATOR_BACKEND=nvidia_transformers ./start.sh
 - `scripts/check_env.py`: environment and dataset checks.
 - `scripts/run_smoke_tests.sh`: compile, environment, and multi-frame pipeline smoke test.
 - `.env.example`: runtime configuration template.
-

@@ -251,6 +251,11 @@ def get_transformers_worker():
         dtype_name
     )
 
+    attn_implementation = os.getenv(
+        "NVIDIA_LOCATE_ANYTHING_ATTN_IMPLEMENTATION",
+        "sdpa"
+    )
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_path,
         trust_remote_code=True
@@ -264,7 +269,8 @@ def get_transformers_worker():
     model = AutoModel.from_pretrained(
         model_path,
         torch_dtype=dtype,
-        trust_remote_code=True
+        trust_remote_code=True,
+        attn_implementation=attn_implementation
     ).to(device).eval()
 
     return LocateAnythingWorker(

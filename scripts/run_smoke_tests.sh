@@ -11,10 +11,23 @@ if [ -f ".env" ]; then
     set +a
 fi
 
-VENV_DIR="${VENV_DIR:-.venv}"
 FRAME_COUNT="${FRAME_COUNT:-5}"
 
-if [ -d "$VENV_DIR" ]; then
+detect_venv_dir() {
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        printf '%s\n' "$VIRTUAL_ENV"
+    elif [ -n "${VENV_DIR:-}" ]; then
+        printf '%s\n' "$VENV_DIR"
+    elif [ -d "venv" ]; then
+        printf '%s\n' "venv"
+    else
+        printf '%s\n' ".venv"
+    fi
+}
+
+VENV_DIR="$(detect_venv_dir)"
+
+if [ -z "${VIRTUAL_ENV:-}" ] && [ -d "$VENV_DIR" ]; then
     # shellcheck disable=SC1091
     source "$VENV_DIR/bin/activate"
 fi

@@ -1,41 +1,53 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-pip install -U pip
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-pip install \
-torch \
-torchvision \
-transformers==4.57.1 \
-accelerate \
-sentencepiece \
-einops \
-pillow \
-opencv-python-headless==4.11.0.86 \
-numpy==1.25.0 \
-gradio \
-pandas \
-openai \
-peft \
-decord==0.6.0 \
-lmdb==1.7.5 \
-qwen-vl-utils
+detect_venv_dir() {
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+        printf '%s\n' "$VIRTUAL_ENV"
+    elif [ -n "${VENV_DIR:-}" ]; then
+        printf '%s\n' "$VENV_DIR"
+    elif [ -d "venv" ]; then
+        printf '%s\n' "venv"
+    else
+        printf '%s\n' ".venv"
+    fi
+}
 
-pip install vllm
+VENV_DIR="$(detect_venv_dir)"
 
-cat <<'MSG'
+if [ -z "${VIRTUAL_ENV:-}" ] && [ -d "$VENV_DIR" ]; then
+    # shellcheck disable=SC1091
+    source "$VENV_DIR/bin/activate"
+fi
 
-Optional model servers:
+python -m pip install -U pip
 
-Qwen scene understanding:
-  vllm serve "Qwen/Qwen2.5-VL-7B-Instruct" --host 0.0.0.0 --port 8000
-  VLM_BACKEND=qwen QWEN_VLM_BASE_URL=http://localhost:8000/v1 ./start.sh
+# Keep torch out of this install path. On AMD/ROCm systems the correct torch
+# wheel is usually preinstalled or inherited through --system-site-packages.
+python -m pip install \
+    transformers==4.57.1 \
+    accelerate \
+    sentencepiece \
+    einops \
+    pillow \
+    opencv-python-headless==4.11.0.86 \
+    gradio \
+    pandas \
+    openai \
+    peft \
+    decord==0.6.0 \
+    lmdb==1.7.5 \
+    qwen-vl-utils
 
-NVIDIA LocateAnything localization:
-  vllm serve "nvidia/LocateAnything-3B" --host 0.0.0.0 --port 8001
-  LOCATOR_BACKEND=nvidia_vllm NVIDIA_LOCATE_ANYTHING_BASE_URL=http://localhost:8001/v1 ./start.sh
+python -m pip install /opt/rocm-7.0.0/share/amd_smi 2>/dev/null || \
+    python -m pip install amdsmi
 
-Local Transformers LocateAnything:
-  LOCATOR_BACKEND=nvidia_transformers ./start.sh
-
-MSG
+echo
+echo "Qwen server:"
+echo "  ./scripts/start_qwen_vllm.sh"
+echo
+echo "Demo app:"
+echo "  ./start.sh"
