@@ -859,5 +859,5 @@ demo.launch(
     ),
     allowed_paths=[
         str(DATA_ROOT_ABS)
-    ]
+    ], share=True
 )
