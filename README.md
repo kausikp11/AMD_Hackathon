@@ -15,6 +15,20 @@ The top stream plays all frames as a browser-side canvas stream. The lower contr
 inspect one selected frame through the full copilot pipeline, including boxed
 RGB/thermal views, robot command, world state, risk decision, scene, plan, and
 explanation. Limit the stream/selector with `DEMO_FRAME_COUNT=10` if needed.
+Use `Play Model-Synced` in the lower controls when you want each inspected
+frame to render only after Qwen/control output is complete.
+
+To show Qwen output in sync with the stream, precompute a lightweight cache:
+
+```bash
+VLM_BACKEND=qwen \
+QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
+LOCATOR_BACKEND=labels \
+python scripts/cache_qwen_outputs.py --frame-count 50
+```
+
+Then start the app. The stream will show cached Qwen scene/risk/action/human
+status for frames present in `cache/qwen_stream.json`.
 
 ## Smoke Tests
 

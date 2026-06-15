@@ -6,6 +6,18 @@ from pathlib import Path
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"
 
+GROUNDING_PROMPTS = [
+    "human",
+    "industrial machine",
+    "workbench",
+    "pipe",
+    "cabinet",
+    "storage box",
+    "control panel",
+    "forklift",
+    "robot",
+]
+
 
 class QwenVLM:
 
@@ -98,8 +110,20 @@ def image_to_data_url(image_path):
 
 def scene_prompt():
 
-    return """
+    prompts = "\n".join(
+        f"- {prompt}"
+        for prompt in GROUNDING_PROMPTS
+    )
+
+    return (
+        """
 Analyze this industrial robot workspace.
+
+Use these GroundingDINO-style object prompts for localization:
+
+"""
+        + prompts
+        + """
 
 Return JSON with this exact shape:
 
@@ -131,7 +155,8 @@ If you can estimate object boxes, include them in located_objects using pixel
 coordinates relative to the input image. If boxes are uncertain, return an
 empty located_objects list.
 Return only JSON.
-""".strip()
+"""
+    ).strip()
 
 
 def parse_json_response(content):

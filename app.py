@@ -82,10 +82,41 @@ def frame_media():
     return media
 
 
+def qwen_stream_records():
+
+    cache_path = Path(
+        os.getenv(
+            "QWEN_STREAM_CACHE",
+            "cache/qwen_stream.json"
+        )
+    )
+
+    if not cache_path.exists():
+        return {}
+
+    try:
+        payload = json.loads(
+            cache_path.read_text()
+        )
+    except json.JSONDecodeError:
+        return {}
+
+    return {
+        record["frame_id"]: record
+        for record in payload.get(
+            "records",
+            []
+        )
+    }
+
+
 def live_stream_html():
 
     media_json = json.dumps(
         frame_media()
+    )
+    qwen_json = json.dumps(
+        qwen_stream_records()
     )
 
     iframe = f"""
@@ -133,6 +164,14 @@ def live_stream_html():
     font-size: 14px;
     font-variant-numeric: tabular-nums;
   }}
+  .qwen {{
+    padding: 8px 12px;
+    background: #101820;
+    border-bottom: 1px solid #2a333d;
+    color: #dfe7ef;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }}
   .grid {{
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -170,6 +209,7 @@ def live_stream_html():
     <div id="status" class="label"></div>
     <input id="timeline" type="range" min="0" value="0">
   </div>
+  <div id="qwenStatus" class="qwen">Qwen stream cache: not loaded</div>
   <div class="grid">
     <div class="panel">
       <div class="tag">RGB</div>
@@ -182,6 +222,7 @@ def live_stream_html():
   </div>
   <script>
     const frames = {media_json};
+    const qwenRecords = {qwen_json};
     let index = 0;
     let playing = true;
     let lastFrameTime = 0;
@@ -192,6 +233,7 @@ def live_stream_html():
     const rgbCtx = rgbCanvas.getContext("2d");
     const thermalCtx = thermalCanvas.getContext("2d");
     const status = document.getElementById("status");
+    const qwenStatus = document.getElementById("qwenStatus");
     const timeline = document.getElementById("timeline");
     const fpsInput = document.getElementById("fps");
 
@@ -260,6 +302,19 @@ def live_stream_html():
 
       timeline.value = index;
       status.textContent = `Realtime stream | Frame ${{index + 1}}/${{frames.length}} | ID ${{frame.id}}`;
+      const qwen = qwenRecords[frame.id];
+      if (qwen) {{
+        const distance = qwen.human_distance === null || qwen.human_distance === undefined
+          ? "n/a"
+          : `${{Number(qwen.human_distance).toFixed(2)}} m`;
+        qwenStatus.textContent =
+          `Qwen/cache | Scene ${{qwen.scene_source}} | Risk ${{qwen.risk_level}} | ` +
+          `Action ${{qwen.action}} | Human ${{qwen.human_present}} | ` +
+          `Distance ${{distance}} | Objects ${{qwen.located_count}}`;
+      }} else {{
+        qwenStatus.textContent =
+          "Qwen/cache | no cached output for this frame. Run scripts/cache_qwen_outputs.py to sync model output with the stream.";
+      }}
       preloadAround(index + 1);
     }}
 
@@ -768,6 +823,29 @@ def jump_to_index(index):
     )
 
 
+OUTPUT_COUNT = 12
+
+
+def set_model_loop(value):
+
+    return value
+
+
+def model_loop_tick(index, playing):
+
+    if not playing:
+        return tuple(
+            gr.skip()
+            for _ in range(
+                OUTPUT_COUNT
+            )
+        )
+
+    return next_frame(
+        index
+    )
+
+
 OUTPUTS = []
 
 
@@ -782,11 +860,25 @@ with gr.Blocks() as demo:
     )
 
     gr.Markdown(
-        "The top stream plays the dataset smoothly in the browser. Use the controls below to inspect one frame with bounding boxes, Qwen scene output, and control decisions."
+        "The top stream plays the dataset smoothly in the browser. Use the controls below to inspect one frame, or use model-synced playback to render each frame only after Qwen/control output is ready."
     )
 
     frame_index_state = gr.State(
         value=0
+    )
+
+    model_loop_state = gr.State(
+        value=False
+    )
+
+    model_loop_timer = gr.Timer(
+        value=float(
+            os.getenv(
+                "MODEL_LOOP_SECONDS",
+                "0.25"
+            )
+        ),
+        active=True
     )
 
     status_box = gr.Textbox(
@@ -830,6 +922,14 @@ with gr.Blocks() as demo:
 
         next_btn = gr.Button(
             "Next"
+        )
+
+        model_play_btn = gr.Button(
+            "Play Model-Synced"
+        )
+
+        model_pause_btn = gr.Button(
+            "Pause Model-Synced"
         )
 
     with gr.Row():
@@ -926,6 +1026,39 @@ with gr.Blocks() as demo:
         next_frame,
         inputs=[
             frame_index_state
+        ],
+        outputs=OUTPUTS
+    )
+
+    model_play_btn.click(
+        set_model_loop,
+        inputs=[
+            gr.State(
+                value=True
+            )
+        ],
+        outputs=[
+            model_loop_state
+        ]
+    )
+
+    model_pause_btn.click(
+        set_model_loop,
+        inputs=[
+            gr.State(
+                value=False
+            )
+        ],
+        outputs=[
+            model_loop_state
+        ]
+    )
+
+    model_loop_timer.tick(
+        model_loop_tick,
+        inputs=[
+            frame_index_state,
+            model_loop_state
         ],
         outputs=OUTPUTS
     )
