@@ -508,10 +508,20 @@ def draw_detections(image, detections, target):
             "unknown"
         )
 
-        if target == "thermal" and source != "thermal":
+        if target == "thermal" and source not in {
+            "thermal",
+            "thermal_fallback",
+            "yolo_thermal",
+            "yolo_thermal_fallback"
+        }:
             continue
 
-        if target == "rgb" and source == "thermal":
+        if target == "rgb" and source in {
+            "thermal",
+            "thermal_fallback",
+            "yolo_thermal",
+            "yolo_thermal_fallback"
+        }:
             continue
 
         box = bbox_to_pixels(
@@ -668,18 +678,30 @@ def source_color(source):
         return (86, 180, 233)
 
     if source == "qwen_vlm":
-        return (0, 204, 136)
+        return (204, 121, 255)
 
-    if source == "thermal":
+    if source in {
+        "thermal",
+        "yolo_thermal"
+    }:
         return (213, 94, 0)
 
-    if source == "thermal_fallback":
+    if source in {
+        "thermal_fallback",
+        "yolo_thermal_fallback"
+    }:
         return (213, 94, 0)
 
-    if source == "rgb":
+    if source in {
+        "rgb",
+        "yolo_rgb"
+    }:
         return (240, 228, 66)
 
-    if source == "rgb_fallback":
+    if source in {
+        "rgb_fallback",
+        "yolo_rgb_fallback"
+    }:
         return (240, 228, 66)
 
     return (204, 121, 167)
@@ -694,6 +716,10 @@ def source_label(source):
         "rgb_fallback": "RGB fallback",
         "thermal": "Thermal label",
         "thermal_fallback": "Thermal fallback",
+        "yolo_rgb": "YOLO RGB",
+        "yolo_rgb_fallback": "YOLO RGB fallback",
+        "yolo_thermal": "YOLO thermal",
+        "yolo_thermal_fallback": "YOLO thermal fallback",
         "nvidia_locateanything_transformers": "LocateAnything",
         "nvidia_locateanything_vllm": "LocateAnything"
     }

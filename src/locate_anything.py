@@ -28,6 +28,7 @@ def locate_objects(frame, object_names=None):
 
     Backends:
     - labels: use dataset RGB/thermal labels.
+    - yolo_labels/yolo: use dataset YOLO RGB/thermal labels.
     - grounding_dino: use Hugging Face zero-shot object detection.
     - nvidia_vllm: call nvidia/LocateAnything-3B through vLLM/OpenAI API.
     - nvidia_transformers: load nvidia/LocateAnything-3B locally from HF.
@@ -41,6 +42,16 @@ def locate_objects(frame, object_names=None):
     ).lower()
 
     names = object_names or DEFAULT_OBJECTS
+
+    if backend in {
+        "labels",
+        "yolo",
+        "yolo_labels"
+    }:
+        return locate_from_labels(
+            frame,
+            names
+        )
 
     if backend == "grounding_dino":
         try:
@@ -724,14 +735,14 @@ def locate_from_labels(frame, object_names=None):
 
     sources = [
         (
-            "rgb",
+            "yolo_rgb",
             frame.get(
                 "rgb_detections",
                 []
             )
         ),
         (
-            "thermal",
+            "yolo_thermal",
             frame.get(
                 "thermal_detections",
                 []
@@ -772,9 +783,31 @@ def locate_from_labels(frame, object_names=None):
 
 def normalize_label(label):
 
-    return label.replace(
+    normalized = label.replace(
         " ",
         "_"
+    )
+
+    aliases = {
+        "person":
+            "human",
+        "people":
+            "human",
+        "worker":
+            "human",
+        "operator":
+            "human",
+        "man":
+            "human",
+        "woman":
+            "human",
+        "storage_box":
+            "storage_box"
+    }
+
+    return aliases.get(
+        normalized,
+        normalized
     )
 
 

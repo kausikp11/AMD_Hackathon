@@ -287,9 +287,20 @@ def describe_with_configured_vlm(image_path):
         return None
 
     if backend == "qwen":
-        return describe_with_qwen(
-            image_path
-        )
+        try:
+            return describe_with_qwen(
+                image_path
+            )
+        except Exception as exc:
+            if os.getenv(
+                "QWEN_STRICT",
+                "0"
+            ) == "1":
+                raise
+
+            return qwen_error_scene(
+                exc
+            )
 
     if backend == "auto":
         try:
@@ -309,6 +320,37 @@ def describe_with_qwen(image_path):
     return QwenVLM().describe(
         image_path
     )
+
+
+def qwen_error_scene(exc):
+
+    return {
+        "environment_type":
+            "unknown",
+
+        "objects":
+            [],
+
+        "hazards":
+            [
+                "qwen_scene_error"
+            ],
+
+        "navigation": {
+            "aisle_detected":
+                False,
+            "walkable_region":
+                "unknown",
+            "obstacle_regions":
+                []
+        },
+
+        "located_objects":
+            [],
+
+        "parse_error":
+            f"{type(exc).__name__}: {exc}"
+    }
 
 
 def merge_hazards(*hazard_groups):

@@ -324,12 +324,11 @@ def normalize_objects(objects):
             })
             continue
 
-        label = obj.get(
-            "label",
-            "unknown"
-        ).replace(
-            " ",
-            "_"
+        label = normalize_label(
+            obj.get(
+                "label",
+                "unknown"
+            )
         )
 
         normalized.append({
@@ -366,12 +365,11 @@ def normalize_located_objects(objects):
 
         normalized.append({
             "label":
-                obj.get(
-                    "label",
-                    "unknown"
-                ).replace(
-                    " ",
-                    "_"
+                normalize_label(
+                    obj.get(
+                        "label",
+                        "unknown"
+                    )
                 ),
 
             "bbox":
@@ -398,3 +396,31 @@ def normalize_located_objects(objects):
         })
 
     return normalized
+
+
+def normalize_label(label):
+
+    normalized = label.replace(
+        " ",
+        "_"
+    )
+
+    aliases = {
+        "person":
+            "human",
+        "people":
+            "human",
+        "worker":
+            "human",
+        "operator":
+            "human",
+        "man":
+            "human",
+        "woman":
+            "human"
+    }
+
+    return aliases.get(
+        normalized,
+        normalized
+    )
