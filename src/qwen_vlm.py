@@ -3,20 +3,10 @@ import json
 import os
 from pathlib import Path
 
+from src.tracked_objects import load_tracked_objects
+
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"
-
-GROUNDING_PROMPTS = [
-    "human",
-    "industrial machine",
-    "workbench",
-    "pipe",
-    "cabinet",
-    "storage box",
-    "control panel",
-    "forklift",
-    "robot",
-]
 
 
 class QwenVLM:
@@ -123,7 +113,7 @@ def scene_prompt():
 
     prompts = "\n".join(
         f"- {prompt}"
-        for prompt in GROUNDING_PROMPTS
+        for prompt in load_tracked_objects()
     )
 
     return (
@@ -150,6 +140,12 @@ Return JSON with this exact shape:
     "aisle_detected": true,
     "walkable_region": "center|left|right|unknown",
     "obstacle_regions": ["left", "right"],
+    "floor_region": [
+      {"x": 40, "y": 500},
+      {"x": 600, "y": 500},
+      {"x": 440, "y": 260},
+      {"x": 200, "y": 260}
+    ],
     "desired_path": [
       {"x": 320, "y": 490, "speed": 0.0},
       {"x": 300, "y": 390, "speed": 0.25},
@@ -174,6 +170,10 @@ Keep the path inside image bounds, below the floor horizon, and away from
 visible humans and obstacles. Do not place path points on walls, machines, or
 other vertical surfaces. Include speed at each point as a normalized target
 speed from 0.0 stopped, through 0.5 cautious, to 1.0 normal speed.
+Estimate floor_region as a polygon around the visible traversable floor or
+ground plane. Use 4 to 8 pixel points in image coordinates. Exclude machines,
+walls, tables, people, shelves, and vertical surfaces. If the floor is unclear,
+return an empty floor_region.
 If you can estimate object boxes, include them in located_objects using pixel
 coordinates relative to the input image. If boxes are uncertain, return an
 empty located_objects list.
@@ -297,12 +297,40 @@ def normalize_scene_json(scene):
                     )
                 ),
 
+            "floor_region":
+                normalize_path_points(
+                    navigation.get(
+                        "floor_region",
+                        []
+                    ),
+                    include_speed=False
+                ),
+
+            "floor_region_source":
+                (
+                    "qwen_vlm"
+                    if navigation.get(
+                        "floor_region"
+                    )
+                    else None
+                ),
+
             "desired_path":
                 normalize_path_points(
                     navigation.get(
                         "desired_path",
                         []
+                    ),
+                    include_speed=True
+                ),
+
+            "desired_path_source":
+                (
+                    "qwen_vlm"
+                    if navigation.get(
+                        "desired_path"
                     )
+                    else None
                 )
         },
 
@@ -418,7 +446,7 @@ def normalize_located_objects(objects):
     return normalized
 
 
-def normalize_path_points(points):
+def normalize_path_points(points, include_speed=True):
 
     normalized = []
 
@@ -440,20 +468,24 @@ def normalize_path_points(points):
         except (TypeError, ValueError):
             continue
 
-        normalized.append({
+        normalized_point = {
             "x":
                 x,
 
             "y":
-                y,
+                y
+        }
 
-            "speed":
-                normalize_speed(
-                    point.get(
-                        "speed"
-                    )
+        if include_speed:
+            normalized_point["speed"] = normalize_speed(
+                point.get(
+                    "speed"
                 )
-        })
+            )
+
+        normalized.append(
+            normalized_point
+        )
 
     return normalized
 

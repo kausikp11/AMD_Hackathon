@@ -155,6 +155,21 @@ forklift, and robot. The robot command panel labels its source separately:
 scene output comes from Qwen/heuristics, while command/steering comes from the
 rule-based control algorithm.
 
+## Detection Labels And Path Sources
+
+Tracked detection/VLM labels are configured in `config/tracked_objects.json`.
+Add or remove labels in `track_objects` to change the object prompts used by
+Qwen and open-vocabulary locators. Dataset-label fallback still only returns
+objects that exist in the dataset annotations.
+
+The scene and plan JSON include:
+
+- `desired_path_source`: `qwen_vlm` or `heuristic_floor_projection`.
+- `floor_region_source`: `qwen_vlm` or `heuristic_floor_projection`.
+
+The RGB overlay tints the estimated floor region and clips the speed-colored
+path ribbon to that floor polygon.
+
 ## Useful Files
 
 - `app.py`: Gradio dashboard.

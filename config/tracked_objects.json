@@ -1,11 +1,15 @@
 {
   "track_objects": [
 
+    "human",
+
     "person",
 
     "industrial machine",
 
     "workbench",
+
+    "pipe",
 
     "control panel",
 
@@ -15,10 +19,34 @@
 
     "storage box",
 
+    "box",
+
+    "crate",
+
+    "pallet",
+
+    "shelf",
+
+    "rack",
+
+    "safety cone",
+
+    "barrel",
+
+    "toolbox",
+
     "door",
 
     "forklift",
 
-    "robot"
+    "robot",
+
+    "floor",
+
+    "aisle",
+
+    "walkway",
+
+    "obstacle"
   ]
 }

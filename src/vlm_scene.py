@@ -34,7 +34,10 @@ def build_navigation(environment_type):
                 "left",
                 "right"
             ],
-            "desired_path": []
+            "floor_region": [],
+            "floor_region_source": None,
+            "desired_path": [],
+            "desired_path_source": None
         }
 
     return {
@@ -44,8 +47,36 @@ def build_navigation(environment_type):
             "left",
             "right"
         ],
-        "desired_path": []
+        "floor_region": [],
+        "floor_region_source": None,
+        "desired_path": [],
+        "desired_path_source": None
     }
+
+
+def estimate_floor_region(image_path):
+
+    with Image.open(image_path) as image:
+        width, height = image.size
+
+    return [
+        {
+            "x": width * 0.06,
+            "y": height * 0.98
+        },
+        {
+            "x": width * 0.94,
+            "y": height * 0.98
+        },
+        {
+            "x": width * 0.68,
+            "y": height * 0.52
+        },
+        {
+            "x": width * 0.32,
+            "y": height * 0.52
+        }
+    ]
 
 
 def estimate_desired_path(image_path, navigation, located_objects):
@@ -413,12 +444,38 @@ def describe_scene(frame, world):
     )
 
     if not navigation.get(
+        "floor_region"
+    ):
+        navigation["floor_region"] = estimate_floor_region(
+            image_path
+        )
+        navigation["floor_region_source"] = "heuristic_floor_projection"
+
+    if not navigation.get(
         "desired_path"
     ):
         navigation["desired_path"] = estimate_desired_path(
             image_path,
             navigation,
             all_located_objects
+        )
+        navigation["desired_path_source"] = "heuristic_floor_projection"
+    elif not navigation.get(
+        "desired_path_source"
+    ):
+        navigation["desired_path_source"] = (
+            "qwen_vlm"
+            if vlm_scene
+            else "heuristic_floor_projection"
+        )
+
+    if not navigation.get(
+        "floor_region_source"
+    ):
+        navigation["floor_region_source"] = (
+            "qwen_vlm"
+            if vlm_scene
+            else "heuristic_floor_projection"
         )
 
     scene = {
@@ -525,7 +582,13 @@ def qwen_error_scene(exc):
             "obstacle_regions":
                 [],
             "desired_path":
-                []
+                [],
+            "desired_path_source":
+                None,
+            "floor_region":
+                [],
+            "floor_region_source":
+                None
         },
 
         "located_objects":
@@ -594,6 +657,16 @@ def scene_summary(scene):
     lines.append(
         f"- Walkable: "
         f"{nav['walkable_region']}"
+    )
+
+    lines.append(
+        f"- Path source: "
+        f"{nav.get('desired_path_source', 'unknown')}"
+    )
+
+    lines.append(
+        f"- Floor source: "
+        f"{nav.get('floor_region_source', 'unknown')}"
     )
 
     lines.append(

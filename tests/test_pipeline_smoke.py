@@ -9,3 +9,6 @@ def test_pipeline_smoke_frame():
     assert result["plan"]["action"]
     assert len(result["scene"]["navigation"]["desired_path"]) >= 2
     assert result["plan"]["navigation"]["desired_path"]
+    assert result["plan"]["navigation"]["desired_path_source"]
+    assert result["plan"]["navigation"]["floor_region"]
+    assert result["plan"]["navigation"]["floor_region_source"]

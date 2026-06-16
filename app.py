@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import gradio as gr
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 from src.pipeline import run_pipeline
 
@@ -409,6 +409,17 @@ def analyze_index(index):
         frame["thermal_image"]
     ).convert("RGB")
 
+    rgb = draw_floor_region(
+        rgb,
+        plan.get(
+            "navigation",
+            {}
+        ).get(
+            "floor_region",
+            []
+        )
+    )
+
     rgb = draw_detections(
         rgb,
         scene.get(
@@ -425,6 +436,13 @@ def analyze_index(index):
             {}
         ).get(
             "desired_path",
+            []
+        ),
+        plan.get(
+            "navigation",
+            {}
+        ).get(
+            "floor_region",
             []
         )
     )
@@ -587,7 +605,43 @@ def draw_detections(image, detections, target):
     return output
 
 
-def draw_desired_path(image, path):
+def draw_floor_region(image, floor_region):
+
+    points = polygon_to_pixels(
+        floor_region,
+        image.size
+    )
+
+    if len(points) < 3:
+        return image
+
+    overlay = image.convert(
+        "RGBA"
+    )
+    floor = Image.new(
+        "RGBA",
+        image.size,
+        (0, 0, 0, 0)
+    )
+    draw = ImageDraw.Draw(
+        floor
+    )
+
+    draw.polygon(
+        points,
+        fill=(0, 180, 255, 28),
+        outline=(0, 180, 255, 110)
+    )
+
+    return Image.alpha_composite(
+        overlay,
+        floor
+    ).convert(
+        "RGB"
+    )
+
+
+def draw_desired_path(image, path, floor_region=None):
 
     if not path:
         return image
@@ -614,6 +668,7 @@ def draw_desired_path(image, path):
     output = draw_ground_path_ribbon(
         output,
         curve_points,
+        floor_region,
     )
     draw = ImageDraw.Draw(output)
 
@@ -681,7 +736,7 @@ def draw_stop_point(image, point):
     return output
 
 
-def draw_ground_path_ribbon(image, curve_points):
+def draw_ground_path_ribbon(image, curve_points, floor_region=None):
 
     if len(curve_points) < 2:
         return image
@@ -748,12 +803,106 @@ def draw_ground_path_ribbon(image, curve_points):
             width=5
         )
 
+    ribbon = clip_layer_to_polygon(
+        ribbon,
+        floor_region,
+        image.size
+    )
+
     return Image.alpha_composite(
         overlay,
         ribbon
     ).convert(
         "RGB"
     )
+
+
+def clip_layer_to_polygon(layer, polygon, image_size):
+
+    points = polygon_to_pixels(
+        polygon or [],
+        image_size
+    )
+
+    if len(points) < 3:
+        return layer
+
+    mask = Image.new(
+        "L",
+        image_size,
+        0
+    )
+    mask_draw = ImageDraw.Draw(
+        mask
+    )
+    mask_draw.polygon(
+        points,
+        fill=255
+    )
+
+    alpha = layer.getchannel(
+        "A"
+    )
+    layer.putalpha(
+        ImageChops.multiply(
+            alpha,
+            mask
+        )
+    )
+
+    return layer
+
+
+def polygon_to_pixels(points, image_size):
+
+    width, height = image_size
+    pixels = []
+
+    for point in points:
+
+        if not isinstance(
+            point,
+            dict
+        ):
+            continue
+
+        if "x" not in point or "y" not in point:
+            continue
+
+        try:
+            x = float(
+                point["x"]
+            )
+            y = float(
+                point["y"]
+            )
+        except (TypeError, ValueError):
+            continue
+
+        if 0 <= x <= 1 and 0 <= y <= 1:
+            x *= width
+            y *= height
+
+        pixels.append(
+            (
+                max(
+                    0,
+                    min(
+                        width - 1,
+                        x
+                    )
+                ),
+                max(
+                    0,
+                    min(
+                        height - 1,
+                        y
+                    )
+                )
+            )
+        )
+
+    return pixels
 
 
 def ground_segment_polygon(p1, p2, image_size):
@@ -1175,6 +1324,8 @@ def demo_status(
         f"Human {human['present']} | "
         f"Distance {distance_text} | "
         f"Scene {scene.get('scene_source', 'unknown')} | "
+        f"Path {plan['navigation'].get('desired_path_source', 'unknown')} | "
+        f"Floor {plan['navigation'].get('floor_region_source', 'unknown')} | "
         f"Locator {os.getenv('LOCATOR_BACKEND', 'labels')}"
     )
 
@@ -1213,6 +1364,8 @@ def robot_command_text(world, decision, plan, scene):
     return (
         "Decision source: rule-based control algorithm\n"
         f"Scene source: {scene.get('scene_source', 'unknown')}\n"
+        f"Path source: {plan['navigation'].get('desired_path_source', 'unknown')}\n"
+        f"Floor source: {plan['navigation'].get('floor_region_source', 'unknown')}\n"
         f"Command: {command}\n"
         f"Steering: {steering}\n"
         f"Target speed: {plan['target_speed']}\n"

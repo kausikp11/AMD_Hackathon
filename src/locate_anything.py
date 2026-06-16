@@ -6,20 +6,9 @@ from pathlib import Path
 
 from PIL import Image
 
+from src.tracked_objects import load_tracked_objects
 
 DEFAULT_MODEL = "nvidia/LocateAnything-3B"
-
-DEFAULT_OBJECTS = [
-    "human",
-    "industrial machine",
-    "workbench",
-    "pipe",
-    "cabinet",
-    "storage box",
-    "control panel",
-    "forklift",
-    "robot",
-]
 
 
 def locate_objects(frame, object_names=None):
@@ -42,7 +31,7 @@ def locate_objects(frame, object_names=None):
         "labels"
     ).lower()
 
-    names = object_names or DEFAULT_OBJECTS
+    names = object_names or load_tracked_objects()
 
     if backend in {
         "labels",

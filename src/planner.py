@@ -50,13 +50,33 @@ def determine_navigation(scene, target_speed):
         return {
             "route": nav["walkable_region"],
             "path_status": "available",
-            "desired_path": desired_path
+            "desired_path": desired_path,
+            "desired_path_source": nav.get(
+                "desired_path_source"
+            ),
+            "floor_region": nav.get(
+                "floor_region",
+                []
+            ),
+            "floor_region_source": nav.get(
+                "floor_region_source"
+            )
         }
 
     return {
         "route": None,
         "path_status": "unknown",
-        "desired_path": desired_path
+        "desired_path": desired_path,
+        "desired_path_source": nav.get(
+            "desired_path_source"
+        ),
+        "floor_region": nav.get(
+            "floor_region",
+            []
+        ),
+        "floor_region_source": nav.get(
+            "floor_region_source"
+        )
     }
 
 
