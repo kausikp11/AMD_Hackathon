@@ -23,6 +23,10 @@ if [ -z "${VIRTUAL_ENV:-}" ] && [ -d "$VENV_DIR" ]; then
     source "$VENV_DIR/bin/activate"
 fi
 
+if [ "${QWEN_VLLM_SKIP_ENV_CHECK:-0}" != "1" ]; then
+    python3 scripts/check_vllm_env.py
+fi
+
 unset CUDA_VISIBLE_DEVICES
 unset VLLM_USE_V1
 

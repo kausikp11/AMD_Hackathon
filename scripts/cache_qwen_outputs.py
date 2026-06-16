@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
@@ -86,6 +87,43 @@ def compact(frame_id, result):
     }
 
 
+def load_existing_records(output_path):
+
+    if not output_path.exists():
+        return []
+
+    try:
+        payload = json.loads(
+            output_path.read_text()
+        )
+    except json.JSONDecodeError:
+        return []
+
+    return payload.get(
+        "records",
+        []
+    )
+
+
+def write_records(output_path, records):
+
+    temp_path = output_path.with_suffix(
+        output_path.suffix + ".tmp"
+    )
+    temp_path.write_text(
+        json.dumps(
+            {
+                "records":
+                    records
+            },
+            indent=2
+        )
+    )
+    temp_path.replace(
+        output_path
+    )
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -106,6 +144,11 @@ def main():
             "cache/qwen_stream.json"
         )
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Recompute frames even if they already exist in the cache."
+    )
     args = parser.parse_args()
 
     os.environ.setdefault(
@@ -125,18 +168,41 @@ def main():
         exist_ok=True
     )
 
-    records = []
+    records = (
+        []
+        if args.force
+        else load_existing_records(
+            output_path
+        )
+    )
+    existing = {
+        record.get(
+            "frame_id"
+        )
+        for record in records
+    }
+
+    frames = frame_ids(
+        args.frame_count
+    )
 
     for idx, frame_id in enumerate(
-        frame_ids(
-            args.frame_count
-        ),
+        frames,
         start=1
     ):
+
+        if frame_id in existing:
+            print(
+                f"[{idx}/{len(frames)}] skip {frame_id} already cached",
+                flush=True
+            )
+            continue
+
         print(
-            f"[{idx}] caching {frame_id}",
+            f"[{idx}/{len(frames)}] caching {frame_id}",
             flush=True
         )
+        start = time.perf_counter()
         result = run_pipeline(
             frame_id
         )
@@ -146,16 +212,18 @@ def main():
                 result
             )
         )
-
-    output_path.write_text(
-        json.dumps(
-            {
-                "records":
-                    records
-            },
-            indent=2
+        existing.add(
+            frame_id
         )
-    )
+        write_records(
+            output_path,
+            records
+        )
+        elapsed = time.perf_counter() - start
+        print(
+            f"[{idx}/{len(frames)}] wrote {frame_id} in {elapsed:.2f}s",
+            flush=True
+        )
 
     print(
         f"Wrote {len(records)} records to {output_path}"

@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import platform
+import shutil
 from pathlib import Path
 
 
@@ -55,6 +56,16 @@ def main():
         has_module("ultralytics"),
         "needed only for LOCATOR_BACKEND=yolo_live"
     )
+    status(
+        "optional vllm CLI",
+        shutil.which("vllm") is not None,
+        "needed only for ./scripts/start_qwen_vllm.sh"
+    )
+    status(
+        "optional locate-anything-cli",
+        shutil.which("locate-anything-cli") is not None,
+        "needed only for LOCATOR_BACKEND=locate_anything_cpp unless LOCATE_ANYTHING_CPP_BIN is set"
+    )
 
     print()
     print("Runtime configuration:")
@@ -67,6 +78,8 @@ def main():
         "QWEN_VLM_MODEL",
         "NVIDIA_LOCATE_ANYTHING_BASE_URL",
         "NVIDIA_LOCATE_ANYTHING_MODEL",
+        "LOCATE_ANYTHING_CPP_BIN",
+        "LOCATE_ANYTHING_CPP_MODEL",
     ]:
         print(f"{key}={os.getenv(key, '')}")
 

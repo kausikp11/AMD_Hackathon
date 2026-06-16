@@ -91,6 +91,16 @@ Serve Qwen on the AMD resource using the helper:
 ./scripts/start_qwen_vllm.sh
 ```
 
+If the AMD image has the known vLLM dependency mismatch, the helper prints the
+repair command. You can run the bundled repair explicitly:
+
+```bash
+./scripts/fix_amd_vllm_env.sh
+```
+
+This pins the versions that avoid the observed `huggingface-hub>=0.34,<1.0`
+and `prometheus_fastapi_instrumentator` / FastAPI route crashes.
+
 Then run the app in another terminal:
 
 ```bash
@@ -136,6 +146,30 @@ NVIDIA_LOCATE_ANYTHING_ATTN_IMPLEMENTATION=sdpa \
 
 The project also supports the `mudler/locate-anything.cpp` CLI backend:
 
+Install/build example:
+
+```bash
+cd /workspace
+git clone --recursive https://github.com/mudler/locate-anything.cpp
+cd locate-anything.cpp
+cmake -B build -DLA_BUILD_CLI=ON
+cmake --build build -j
+hf download mudler/locate-anything.cpp-gguf locate-anything-q8_0.gguf --local-dir models
+```
+
+Direct CLI smoke test:
+
+```bash
+/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli detect \
+  --model /workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
+  --input /workspace/AMD_Hackathon/data/industrial_subset/05_rgb/calibrated/013342.jpg \
+  --prompt "Locate all the instances that matches the following description: human</c>industrial machine</c>workbench</c>storage box." \
+  --mode hybrid \
+  --output /tmp/la_boxes.json
+```
+
+App mode:
+
 ```bash
 LOCATOR_BACKEND=locate_anything_cpp \
 LOCATE_ANYTHING_CPP_BIN=/path/to/locate-anything-cli \
@@ -147,6 +181,51 @@ LOCATE_ANYTHING_CPP_MODE=hybrid \
 The CLI prompt is built from `config/tracked_objects.json`; categories are
 separated with `</c>` as required by locate-anything.cpp. Use
 `LOCATE_ANYTHING_CPP_STRICT=1` to fail instead of falling back to dataset labels.
+
+To cache Qwen plus locate-anything.cpp overlays for the top stream:
+
+```bash
+VLM_BACKEND=qwen \
+QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
+LOCATOR_BACKEND=locate_anything_cpp \
+LOCATE_ANYTHING_CPP_BIN=/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
+LOCATE_ANYTHING_CPP_MODEL=/workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
+LOCATE_ANYTHING_CPP_MODE=hybrid \
+python scripts/cache_qwen_outputs.py --frame-count 621
+```
+
+The cache script is resumable: it writes `cache/qwen_stream.json` after every
+frame and skips frames already present in the cache. Use `--force` to recompute
+everything.
+
+Then start with the same locator settings:
+
+```bash
+DEMO_FRAME_COUNT=621 \
+VLM_BACKEND=qwen \
+QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
+LOCATOR_BACKEND=locate_anything_cpp \
+LOCATE_ANYTHING_CPP_BIN=/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
+LOCATE_ANYTHING_CPP_MODEL=/workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
+LOCATE_ANYTHING_CPP_MODE=hybrid \
+GRADIO_SHARE=1 \
+./start.sh
+```
+
+Benchmark latency and GPU snapshots:
+
+```bash
+VLM_BACKEND=qwen \
+QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
+LOCATOR_BACKEND=locate_anything_cpp \
+LOCATE_ANYTHING_CPP_BIN=/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
+LOCATE_ANYTHING_CPP_MODEL=/workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
+LOCATE_ANYTHING_CPP_MODE=hybrid \
+python scripts/benchmark_pipeline.py --frame-count 10
+```
+
+Outputs are written to `outputs/benchmark_pipeline.json` and
+`outputs/benchmark_pipeline.csv`.
 
 ## GroundingDINO Localization
 
