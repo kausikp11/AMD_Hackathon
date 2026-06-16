@@ -540,6 +540,11 @@ def locate_with_locate_anything_cpp_http(frame, object_names=None):
             image_path,
         "prompt":
             prompt,
+        "bypass_cache":
+            os.getenv(
+                "LOCATE_ANYTHING_CPP_BYPASS_CACHE",
+                "0"
+            ) == "1",
         "object_names":
             list(
                 object_names or load_tracked_objects()

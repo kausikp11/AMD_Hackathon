@@ -157,6 +157,12 @@ class LocateAnythingHandler(BaseHTTPRequestHandler):
             prompt = str(
                 payload["prompt"]
             )
+            bypass_cache = bool(
+                payload.get(
+                    "bypass_cache",
+                    False
+                )
+            )
 
             if not Path(
                 image_path
@@ -173,7 +179,7 @@ class LocateAnythingHandler(BaseHTTPRequestHandler):
             )
             cache_path = self.server.cache_dir / f"{key}.json"
 
-            if cache_path.exists():
+            if cache_path.exists() and not bypass_cache:
                 cached = json.loads(
                     cache_path.read_text()
                 )
@@ -192,6 +198,11 @@ class LocateAnythingHandler(BaseHTTPRequestHandler):
                 image_path,
                 prompt
             )
+            result.setdefault(
+                "_wrapper",
+                {}
+            )
+            result["_wrapper"]["bypass_cache"] = bypass_cache
             cache_path.write_text(
                 json.dumps(
                     result,

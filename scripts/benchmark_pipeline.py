@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
@@ -136,7 +137,42 @@ def timed_call(fn):
     return value, elapsed
 
 
-def benchmark_frame(frame_id):
+@contextmanager
+def temporary_env(updates):
+
+    previous = {
+        key:
+            os.environ.get(
+                key
+            )
+        for key in updates
+    }
+
+    try:
+        for key, value in updates.items():
+            if value is None:
+                os.environ.pop(
+                    key,
+                    None
+                )
+            else:
+                os.environ[key] = str(
+                    value
+                )
+
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(
+                    key,
+                    None
+                )
+            else:
+                os.environ[key] = value
+
+
+def benchmark_frame(frame_id, bypass_locator_cache):
 
     frame = load_frame(
         frame_id
@@ -144,11 +180,26 @@ def benchmark_frame(frame_id):
 
     gpu_before = rocm_smi_snapshot()
 
-    located, locator_seconds = timed_call(
-        lambda: locate_objects(
-            frame
+    with temporary_env({
+        "LOCATE_ANYTHING_CPP_BYPASS_CACHE":
+            "1" if bypass_locator_cache else None
+    }):
+        located, locator_cold_seconds = timed_call(
+            lambda: locate_objects(
+                frame
+            )
         )
-    )
+
+    with temporary_env({
+        "LOCATE_ANYTHING_CPP_BYPASS_CACHE":
+            None
+    }):
+        cached_located, locator_cached_seconds = timed_call(
+            lambda: locate_objects(
+                frame
+            )
+        )
+
     result, pipeline_seconds = timed_call(
         lambda: run_pipeline(
             frame_id
@@ -187,7 +238,34 @@ def benchmark_frame(frame_id):
             plan["target_speed"],
         "locator_seconds":
             round(
-                locator_seconds,
+                locator_cold_seconds,
+                4
+            ),
+        "locator_cold_seconds":
+            round(
+                locator_cold_seconds,
+                4
+            ),
+        "locator_cached_seconds":
+            round(
+                locator_cached_seconds,
+                4
+            ),
+        "pipeline_non_locator_seconds":
+            round(
+                max(
+                    0.0,
+                    pipeline_seconds - locator_cached_seconds
+                ),
+                4
+            ),
+        "estimated_cold_e2e_seconds":
+            round(
+                locator_cold_seconds
+                + max(
+                    0.0,
+                    pipeline_seconds - locator_cached_seconds
+                ),
                 4
             ),
         "pipeline_seconds":
@@ -198,6 +276,10 @@ def benchmark_frame(frame_id):
         "located_count":
             len(
                 located
+            ),
+        "cached_located_count":
+            len(
+                cached_located
             ),
         "pipeline_located_count":
             len(
@@ -239,8 +321,13 @@ def write_csv(path, records):
         "action",
         "target_speed",
         "locator_seconds",
+        "locator_cold_seconds",
+        "locator_cached_seconds",
+        "pipeline_non_locator_seconds",
+        "estimated_cold_e2e_seconds",
         "pipeline_seconds",
         "located_count",
+        "cached_located_count",
         "pipeline_located_count",
         "path_source",
         "floor_source"
@@ -282,6 +369,14 @@ def main():
         "--output-csv",
         default="outputs/benchmark_pipeline.csv"
     )
+    parser.add_argument(
+        "--use-existing-locator-cache",
+        action="store_true",
+        help=(
+            "Do not force the locate-anything.cpp HTTP wrapper to recompute "
+            "the first locator call for each frame."
+        )
+    )
     args = parser.parse_args()
 
     records = []
@@ -297,7 +392,8 @@ def main():
             flush=True
         )
         record = benchmark_frame(
-            frame_id
+            frame_id,
+            not args.use_existing_locator_cache
         )
         records.append(
             record
@@ -309,8 +405,12 @@ def main():
                         record["frame_id"],
                     "locator_seconds":
                         record["locator_seconds"],
+                    "locator_cached_seconds":
+                        record["locator_cached_seconds"],
                     "pipeline_seconds":
                         record["pipeline_seconds"],
+                    "estimated_cold_e2e_seconds":
+                        record["estimated_cold_e2e_seconds"],
                     "located_count":
                         record["located_count"]
                 }
@@ -372,11 +472,25 @@ def main():
             record["pipeline_seconds"]
             for record in records
         ) / len(records)
+        cached_locator_avg = sum(
+            record["locator_cached_seconds"]
+            for record in records
+        ) / len(records)
+        cold_e2e_avg = sum(
+            record["estimated_cold_e2e_seconds"]
+            for record in records
+        ) / len(records)
         print(
             f"Average locator latency: {locator_avg:.3f}s"
         )
         print(
+            f"Average cached locator latency: {cached_locator_avg:.3f}s"
+        )
+        print(
             f"Average pipeline latency: {pipeline_avg:.3f}s"
+        )
+        print(
+            f"Average estimated cold end-to-end latency: {cold_e2e_avg:.3f}s"
         )
 
     print(

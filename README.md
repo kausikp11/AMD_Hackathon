@@ -46,6 +46,16 @@ Run a larger check:
 FRAME_COUNT=20 ./scripts/run_smoke_tests.sh
 ```
 
+## Committee Runbook
+
+The main demo commands for benchmark, caching, Qwen, locate-anything.cpp, and
+Gradio are collected in `docs/COMMITTEE_RUNBOOK.md`. A PDF copy can be generated
+from the same file with:
+
+```bash
+pandoc docs/COMMITTEE_RUNBOOK.md -o docs/COMMITTEE_RUNBOOK.pdf --pdf-engine=xelatex
+```
+
 ## Runtime Modes
 
 The AMD-safe final-demo default is:
@@ -212,10 +222,8 @@ To cache Qwen plus locate-anything.cpp overlays for the top stream:
 ```bash
 VLM_BACKEND=qwen \
 QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
-LOCATOR_BACKEND=locate_anything_cpp \
-LOCATE_ANYTHING_CPP_BIN=/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
-LOCATE_ANYTHING_CPP_MODEL=/workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
-LOCATE_ANYTHING_CPP_MODE=hybrid \
+LOCATOR_BACKEND=locate_anything_cpp_http \
+LOCATE_ANYTHING_CPP_URL=http://127.0.0.1:8188/detect \
 python scripts/cache_qwen_outputs.py --frame-count 621
 ```
 
@@ -229,10 +237,8 @@ Then start with the same locator settings:
 DEMO_FRAME_COUNT=621 \
 VLM_BACKEND=qwen \
 QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
-LOCATOR_BACKEND=locate_anything_cpp \
-LOCATE_ANYTHING_CPP_BIN=/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
-LOCATE_ANYTHING_CPP_MODEL=/workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
-LOCATE_ANYTHING_CPP_MODE=hybrid \
+LOCATOR_BACKEND=locate_anything_cpp_http \
+LOCATE_ANYTHING_CPP_URL=http://127.0.0.1:8188/detect \
 GRADIO_SHARE=1 \
 ./start.sh
 ```
@@ -242,15 +248,17 @@ Benchmark latency and GPU snapshots:
 ```bash
 VLM_BACKEND=qwen \
 QWEN_VLM_BASE_URL=http://localhost:8000/v1 \
-LOCATOR_BACKEND=locate_anything_cpp \
-LOCATE_ANYTHING_CPP_BIN=/workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
-LOCATE_ANYTHING_CPP_MODEL=/workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
-LOCATE_ANYTHING_CPP_MODE=hybrid \
+LOCATOR_BACKEND=locate_anything_cpp_http \
+LOCATE_ANYTHING_CPP_URL=http://127.0.0.1:8188/detect \
 python scripts/benchmark_pipeline.py --frame-count 10
 ```
 
 Outputs are written to `outputs/benchmark_pipeline.json` and
-`outputs/benchmark_pipeline.csv`.
+`outputs/benchmark_pipeline.csv`. The benchmark reports cold locator latency,
+cached locator latency, warm pipeline latency, and estimated cold end-to-end
+latency. By default it asks the HTTP wrapper to bypass its cache for the first
+locator timing per frame; add `--use-existing-locator-cache` if you want to
+measure a fully warm run.
 
 ## GroundingDINO Localization
 
