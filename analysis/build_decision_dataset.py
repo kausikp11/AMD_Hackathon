@@ -1,12 +1,16 @@
 from pathlib import Path
 import pandas as pd
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
 
 from src.loader import load_frame
 from src.world_state import build_world_state
 from src.reasoner import reason
 
 
-FRAME_FILE = "data/industrial_subset/frames.txt"
+FRAME_FILE = ROOT_DIR / "data/industrial_subset/frames.txt"
 
 rows = []
 
@@ -64,12 +68,12 @@ for i, frame_id in enumerate(frame_ids):
 df = pd.DataFrame(rows)
 
 df.to_csv(
-    "decision_dataset.csv",
+    ROOT_DIR / "outputs/decision_dataset.csv",
     index=False
 )
 
 print("\nSaved:")
-print("decision_dataset.csv")
+print("outputs/decision_dataset.csv")
 
 print("\nRisk distribution:")
 print(

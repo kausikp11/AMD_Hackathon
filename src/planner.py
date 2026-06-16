@@ -34,21 +34,87 @@ def determine_goal(world):
     return "continue_patrol"
 
 
-def determine_navigation(scene):
+def determine_navigation(scene, target_speed):
 
     nav = scene["navigation"]
+    desired_path = apply_speed_profile(
+        nav.get(
+            "desired_path",
+            []
+        ),
+        target_speed
+    )
 
     if nav["aisle_detected"]:
 
         return {
             "route": nav["walkable_region"],
-            "path_status": "available"
+            "path_status": "available",
+            "desired_path": desired_path
         }
 
     return {
         "route": None,
-        "path_status": "unknown"
+        "path_status": "unknown",
+        "desired_path": desired_path
     }
+
+
+def apply_speed_profile(path, target_speed):
+
+    if not path:
+        return []
+
+    target_speed = max(
+        0.0,
+        min(
+            1.0,
+            float(
+                target_speed
+            )
+        )
+    )
+
+    if target_speed == 0.0:
+        return [
+            {
+                **path[0],
+                "speed": 0.0
+            }
+        ]
+
+    max_index = max(
+        len(path) - 1,
+        1
+    )
+    profiled = []
+
+    for index, point in enumerate(path):
+        ratio = index / max_index
+        fallback_speed = target_speed * ratio
+        speed = point.get(
+            "speed",
+            fallback_speed
+        )
+
+        if speed is None:
+            speed = fallback_speed
+
+        profiled.append({
+            **point,
+            "speed":
+                max(
+                    0.0,
+                    min(
+                        target_speed,
+                        float(
+                            speed
+                        )
+                    )
+                )
+        })
+
+    return profiled
 
 
 def plan(
@@ -60,6 +126,8 @@ def plan(
 
     risk = decision["risk_level"]
 
+    target_speed = determine_speed(risk)
+
     planner_output = {
 
         "mode":
@@ -69,13 +137,16 @@ def plan(
             decision["action"],
 
         "target_speed":
-            determine_speed(risk),
+            target_speed,
 
         "goal":
             determine_goal(world),
 
         "navigation":
-            determine_navigation(scene),
+            determine_navigation(
+                scene,
+                target_speed
+            ),
 
         "reasoning":
             decision["reasoning"],
@@ -110,4 +181,3 @@ Navigation:
 Reasoning:
 - {plan['reasoning']}
 """.strip()
-

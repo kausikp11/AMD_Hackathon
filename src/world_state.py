@@ -63,7 +63,12 @@ def build_world_state(frame):
                 ),
 
             "thermal_confirmed":
-                state["thermal_confirmed"]
+                state["thermal_confirmed"],
+
+            "source":
+                state.get(
+                    "human_source"
+                )
         },
 
         "scene": {
@@ -131,6 +136,9 @@ def classify_scene(world):
 
     if human["proximity"] == "very_near":
         tags.append("critical_proximity")
+
+    if human["present"] and human["proximity"] == "unknown":
+        tags.append("unknown_human_distance")
 
     if scene["motion_level"] == "high":
         tags.append("dynamic_environment")

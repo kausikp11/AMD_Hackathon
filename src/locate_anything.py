@@ -29,6 +29,7 @@ def locate_objects(frame, object_names=None):
     Backends:
     - labels: use dataset RGB/thermal labels.
     - yolo_labels/yolo: use dataset YOLO RGB/thermal labels.
+    - yolo_live: run Ultralytics YOLO on the RGB image.
     - grounding_dino: use Hugging Face zero-shot object detection.
     - nvidia_vllm: call nvidia/LocateAnything-3B through vLLM/OpenAI API.
     - nvidia_transformers: load nvidia/LocateAnything-3B locally from HF.
@@ -52,6 +53,28 @@ def locate_objects(frame, object_names=None):
             frame,
             names
         )
+
+    if backend == "yolo_live":
+        try:
+            return locate_with_yolo_live(
+                frame,
+                names
+            )
+        except Exception as exc:
+            if os.getenv(
+                "YOLO_LIVE_STRICT",
+                "0"
+            ) == "1":
+                raise
+
+            return mark_fallback(
+                locate_from_labels(
+                    frame,
+                    names
+                ),
+                "yolo_live",
+                exc
+            )
 
     if backend == "grounding_dino":
         try:
@@ -88,6 +111,14 @@ def locate_objects(frame, object_names=None):
         )
 
     if backend == "auto":
+        try:
+            return locate_with_yolo_live(
+                frame,
+                names
+            )
+        except Exception:
+            pass
+
         try:
             return locate_with_grounding_dino(
                 frame,
@@ -353,6 +384,154 @@ def locate_with_grounding_dino(frame, object_names=None):
         })
 
     return located
+
+
+def locate_with_yolo_live(frame, object_names=None):
+
+    image_path = require_rgb_image(
+        frame
+    )
+
+    image = Image.open(
+        image_path
+    ).convert("RGB")
+
+    model = get_yolo_model()
+
+    kwargs = {
+        "conf":
+            float(
+                os.getenv(
+                    "YOLO_LIVE_CONF",
+                    "0.25"
+                )
+            ),
+        "verbose":
+            False
+    }
+
+    device = os.getenv(
+        "YOLO_LIVE_DEVICE"
+    )
+
+    if device:
+        kwargs["device"] = device
+
+    results = model(
+        image,
+        **kwargs
+    )
+
+    wanted = yolo_wanted_labels(
+        object_names
+    )
+
+    located = []
+
+    for result in results:
+
+        names = getattr(
+            result,
+            "names",
+            {}
+        )
+
+        boxes = getattr(
+            result,
+            "boxes",
+            None
+        )
+
+        if boxes is None:
+            continue
+
+        for box in boxes:
+
+            cls_id = int(
+                box.cls[0].item()
+            )
+
+            raw_label = names.get(
+                cls_id,
+                f"class_{cls_id}"
+            )
+
+            label = normalize_label(
+                raw_label
+            )
+
+            if wanted is not None and label not in wanted:
+                continue
+
+            x1, y1, x2, y2 = [
+                float(value)
+                for value in box.xyxy[0].tolist()
+            ]
+
+            located.append({
+                "label":
+                    label,
+
+                "bbox": {
+                    "x1":
+                        x1,
+                    "y1":
+                        y1,
+                    "x2":
+                        x2,
+                    "y2":
+                        y2
+                },
+
+                "distance":
+                    None,
+
+                "confidence":
+                    float(
+                        box.conf[0].item()
+                    ),
+
+                "source":
+                    "yolo_live"
+            })
+
+    return located
+
+
+@lru_cache(maxsize=1)
+def get_yolo_model():
+
+    try:
+        from ultralytics import YOLO
+    except Exception as exc:
+        raise RuntimeError(
+            "YOLO live backend requires `ultralytics`. Install it or use "
+            "LOCATOR_BACKEND=labels for the stable dataset-label path."
+        ) from exc
+
+    return YOLO(
+        os.getenv(
+            "YOLO_LIVE_MODEL",
+            "yolo11n.pt"
+        )
+    )
+
+
+def yolo_wanted_labels(object_names):
+
+    if object_names is None:
+        return None
+
+    wanted = normalize_tracked_names(
+        object_names
+    )
+
+    if "human" in wanted:
+        wanted.add(
+            "person"
+        )
+
+    return wanted
 
 
 def mark_fallback(detections, requested_backend, exc):

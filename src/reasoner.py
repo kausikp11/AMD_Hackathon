@@ -87,6 +87,24 @@ def reason(world):
                 "Radar indicates a dynamic environment."
             )
 
+    elif "unknown_human_distance" in tags:
+
+        risk_level = "MEDIUM"
+        action = "PROCEED_WITH_CAUTION"
+        confidence = "LOW"
+
+        reasons.append(
+            "Human detected, but distance is unavailable."
+        )
+
+        if "dynamic_environment" in tags:
+
+            confidence = "MEDIUM"
+
+            reasons.append(
+                "Radar indicates a dynamic environment."
+            )
+
     # --------------------------------------------------
     # LOW
     # --------------------------------------------------

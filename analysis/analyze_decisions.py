@@ -1,8 +1,11 @@
 # analyze_decisions.py
 
 import pandas as pd
+from pathlib import Path
 
-df = pd.read_csv("decision_dataset.csv")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+df = pd.read_csv(ROOT_DIR / "outputs/decision_dataset.csv")
 
 print("\nRisk Levels")
 print(df["risk_level"].value_counts())

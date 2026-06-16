@@ -149,7 +149,12 @@ Return JSON with this exact shape:
   "navigation": {
     "aisle_detected": true,
     "walkable_region": "center|left|right|unknown",
-    "obstacle_regions": ["left", "right"]
+    "obstacle_regions": ["left", "right"],
+    "desired_path": [
+      {"x": 320, "y": 490, "speed": 0.0},
+      {"x": 300, "y": 390, "speed": 0.25},
+      {"x": 320, "y": 270, "speed": 0.5}
+    ]
   },
   "located_objects": [
     {
@@ -162,6 +167,13 @@ Return JSON with this exact shape:
 
 Use snake_case labels. Focus on humans, robots, machines, workbenches,
 carts, cabinets, boxes, forklifts, pipes, obstacles, and navigable aisles.
+Estimate desired_path as 3 to 6 pixel waypoints on the visible floor or ground
+plane. The first point should be near the robot at the bottom of the image,
+and later points should move through the safest visible aisle or free space.
+Keep the path inside image bounds, below the floor horizon, and away from
+visible humans and obstacles. Do not place path points on walls, machines, or
+other vertical surfaces. Include speed at each point as a normalized target
+speed from 0.0 stopped, through 0.5 cautious, to 1.0 normal speed.
 If you can estimate object boxes, include them in located_objects using pixel
 coordinates relative to the input image. If boxes are uncertain, return an
 empty located_objects list.
@@ -283,6 +295,14 @@ def normalize_scene_json(scene):
                         "obstacle_regions",
                         []
                     )
+                ),
+
+            "desired_path":
+                normalize_path_points(
+                    navigation.get(
+                        "desired_path",
+                        []
+                    )
                 )
         },
 
@@ -396,6 +416,67 @@ def normalize_located_objects(objects):
         })
 
     return normalized
+
+
+def normalize_path_points(points):
+
+    normalized = []
+
+    for point in points:
+
+        if not isinstance(point, dict):
+            continue
+
+        if "x" not in point or "y" not in point:
+            continue
+
+        try:
+            x = float(
+                point["x"]
+            )
+            y = float(
+                point["y"]
+            )
+        except (TypeError, ValueError):
+            continue
+
+        normalized.append({
+            "x":
+                x,
+
+            "y":
+                y,
+
+            "speed":
+                normalize_speed(
+                    point.get(
+                        "speed"
+                    )
+                )
+        })
+
+    return normalized
+
+
+def normalize_speed(speed):
+
+    if speed is None:
+        return None
+
+    try:
+        value = float(
+            speed
+        )
+    except (TypeError, ValueError):
+        return None
+
+    return max(
+        0.0,
+        min(
+            1.0,
+            value
+        )
+    )
 
 
 def normalize_label(label):

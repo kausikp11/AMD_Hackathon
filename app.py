@@ -418,6 +418,17 @@ def analyze_index(index):
         target="rgb"
     )
 
+    rgb = draw_desired_path(
+        rgb,
+        plan.get(
+            "navigation",
+            {}
+        ).get(
+            "desired_path",
+            []
+        )
+    )
+
     thermal = draw_detections(
         thermal,
         scene.get(
@@ -576,6 +587,407 @@ def draw_detections(image, detections, target):
     return output
 
 
+def draw_desired_path(image, path):
+
+    if not path:
+        return image
+
+    output = image.copy()
+    points = path_to_pixels(
+        path,
+        output.size
+    )
+
+    if len(points) == 1:
+        return draw_stop_point(
+            output,
+            points[0]
+        )
+
+    if len(points) < 2:
+        return output
+
+    curve_points = smooth_path_points(
+        points
+    )
+
+    output = draw_ground_path_ribbon(
+        output,
+        curve_points,
+    )
+    draw = ImageDraw.Draw(output)
+
+    for idx, point in enumerate(
+        [
+            points[0],
+            points[-1]
+        ]
+    ):
+        radius = 7 if idx == 1 else 5
+        x, y, speed = point
+        marker_color = speed_color(
+            speed
+        )
+        draw.ellipse(
+            [
+                x - radius,
+                y - radius,
+                x + radius,
+                y + radius
+            ],
+            fill=marker_color,
+            outline=(0, 0, 0),
+            width=2
+        )
+
+    return output
+
+
+def draw_stop_point(image, point):
+
+    output = image.copy()
+    draw = ImageDraw.Draw(output)
+    x, y, speed = point
+    color = speed_color(
+        speed
+    )
+    radius = ground_path_half_width(
+        y,
+        output.size[1]
+    ) * 0.45
+
+    draw.ellipse(
+        [
+            x - radius - 3,
+            y - radius - 3,
+            x + radius + 3,
+            y + radius + 3
+        ],
+        fill=(0, 0, 0),
+        outline=None
+    )
+    draw.ellipse(
+        [
+            x - radius,
+            y - radius,
+            x + radius,
+            y + radius
+        ],
+        fill=color,
+        outline=(255, 255, 255),
+        width=3
+    )
+
+    return output
+
+
+def draw_ground_path_ribbon(image, curve_points):
+
+    if len(curve_points) < 2:
+        return image
+
+    overlay = image.convert(
+        "RGBA"
+    )
+    ribbon = Image.new(
+        "RGBA",
+        image.size,
+        (0, 0, 0, 0)
+    )
+    ribbon_draw = ImageDraw.Draw(
+        ribbon
+    )
+
+    for index in range(
+        len(curve_points) - 1
+    ):
+        p1 = curve_points[index]
+        p2 = curve_points[index + 1]
+        polygon = ground_segment_polygon(
+            p1,
+            p2,
+            image.size
+        )
+
+        if not polygon:
+            continue
+
+        color = speed_color(
+            (
+                p1[2]
+                + p2[2]
+            ) / 2
+        )
+
+        ribbon_draw.polygon(
+            polygon,
+            fill=(
+                color[0],
+                color[1],
+                color[2],
+                92
+            )
+        )
+        ribbon_draw.line(
+            [
+                (
+                    p1[0],
+                    p1[1]
+                ),
+                (
+                    p2[0],
+                    p2[1]
+                )
+            ],
+            fill=(
+                color[0],
+                color[1],
+                color[2],
+                230
+            ),
+            width=5
+        )
+
+    return Image.alpha_composite(
+        overlay,
+        ribbon
+    ).convert(
+        "RGB"
+    )
+
+
+def ground_segment_polygon(p1, p2, image_size):
+
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    length = (
+        dx * dx
+        + dy * dy
+    ) ** 0.5
+
+    if length == 0:
+        return None
+
+    normal_x = -dy / length
+    normal_y = dx / length
+    half_width_1 = ground_path_half_width(
+        p1[1],
+        image_size[1]
+    )
+    half_width_2 = ground_path_half_width(
+        p2[1],
+        image_size[1]
+    )
+
+    return [
+        (
+            p1[0] + normal_x * half_width_1,
+            p1[1] + normal_y * half_width_1
+        ),
+        (
+            p2[0] + normal_x * half_width_2,
+            p2[1] + normal_y * half_width_2
+        ),
+        (
+            p2[0] - normal_x * half_width_2,
+            p2[1] - normal_y * half_width_2
+        ),
+        (
+            p1[0] - normal_x * half_width_1,
+            p1[1] - normal_y * half_width_1
+        )
+    ]
+
+
+def ground_path_half_width(y, height):
+
+    floor_ratio = max(
+        0.0,
+        min(
+            1.0,
+            (y / height - 0.50) / 0.46
+        )
+    )
+
+    return 10 + 34 * floor_ratio
+
+
+def speed_color(speed):
+
+    speed = max(
+        0.0,
+        min(
+            1.0,
+            float(
+                speed
+            )
+        )
+    )
+
+    if speed < 0.5:
+        ratio = speed / 0.5
+        return (
+            220,
+            int(64 + 176 * ratio),
+            0
+        )
+
+    ratio = (
+        speed
+        - 0.5
+    ) / 0.5
+
+    return (
+        int(220 - 220 * ratio),
+        220,
+        0
+    )
+
+
+def smooth_path_points(points, samples_per_segment=14):
+
+    if len(points) < 3:
+        return points
+
+    padded = [
+        points[0],
+        *points,
+        points[-1]
+    ]
+    smoothed = []
+
+    for index in range(
+        1,
+        len(padded) - 2
+    ):
+        p0 = padded[index - 1]
+        p1 = padded[index]
+        p2 = padded[index + 1]
+        p3 = padded[index + 2]
+
+        for sample in range(
+            samples_per_segment
+        ):
+            t = sample / samples_per_segment
+            smoothed.append(
+                catmull_rom_point(
+                    p0,
+                    p1,
+                    p2,
+                    p3,
+                    t
+                )
+            )
+
+    smoothed.append(
+        points[-1]
+    )
+
+    return smoothed
+
+
+def catmull_rom_point(p0, p1, p2, p3, t):
+
+    t2 = t * t
+    t3 = t2 * t
+
+    x = 0.5 * (
+        (2 * p1[0])
+        + (-p0[0] + p2[0]) * t
+        + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+        + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+    )
+    y = 0.5 * (
+        (2 * p1[1])
+        + (-p0[1] + p2[1]) * t
+        + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+        + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+    )
+
+    speed = (
+        p1[2]
+        + (
+            p2[2]
+            - p1[2]
+        ) * t
+    )
+
+    return (
+        x,
+        y,
+        speed
+    )
+
+
+def path_to_pixels(path, image_size):
+
+    width, height = image_size
+    points = []
+
+    for point in path:
+
+        if not isinstance(point, dict):
+            continue
+
+        if "x" not in point or "y" not in point:
+            continue
+
+        try:
+            x = float(
+                point["x"]
+            )
+            y = float(
+                point["y"]
+            )
+        except (TypeError, ValueError):
+            continue
+
+        if 0 <= x <= 1 and 0 <= y <= 1:
+            x *= width
+            y *= height
+
+        x = max(
+            0,
+            min(
+                width - 1,
+                x
+            )
+        )
+        y = max(
+            0,
+            min(
+                height - 1,
+                y
+            )
+        )
+
+        speed = point.get(
+            "speed",
+            0.0
+        )
+
+        if speed is None:
+            speed = 0.0
+
+        points.append(
+            (
+                x,
+                y,
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        float(
+                            speed
+                        )
+                    )
+                )
+            )
+        )
+
+    return points
+
+
 def bbox_to_pixels(bbox, image_size):
 
     if not bbox:
@@ -677,6 +1089,12 @@ def source_color(source):
     if source == "grounding_dino":
         return (86, 180, 233)
 
+    if source == "yolo_live":
+        return (0, 158, 115)
+
+    if source == "yolo_live_fallback":
+        return (0, 158, 115)
+
     if source == "qwen_vlm":
         return (204, 121, 255)
 
@@ -720,6 +1138,8 @@ def source_label(source):
         "yolo_rgb_fallback": "YOLO RGB fallback",
         "yolo_thermal": "YOLO thermal",
         "yolo_thermal_fallback": "YOLO thermal fallback",
+        "yolo_live": "YOLO live",
+        "yolo_live_fallback": "YOLO live fallback",
         "nvidia_locateanything_transformers": "LocateAnything",
         "nvidia_locateanything_vllm": "LocateAnything"
     }
@@ -754,7 +1174,8 @@ def demo_status(
         f"Action {plan['action']} | "
         f"Human {human['present']} | "
         f"Distance {distance_text} | "
-        f"Scene {scene.get('scene_source', 'unknown')}"
+        f"Scene {scene.get('scene_source', 'unknown')} | "
+        f"Locator {os.getenv('LOCATOR_BACKEND', 'labels')}"
     )
 
 

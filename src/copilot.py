@@ -15,11 +15,19 @@ def generate_explanation(
 
     if human["present"]:
 
-        lines.append(
+        if human["distance"] is None:
 
-            f"Human detected at "
-            f"{human['distance']:.2f} meters."
-        )
+            lines.append(
+                "Human detected, but distance is unavailable."
+            )
+
+        else:
+
+            lines.append(
+
+                f"Human detected at "
+                f"{human['distance']:.2f} meters."
+            )
 
         if human["thermal_confirmed"]:
 

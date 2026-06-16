@@ -40,14 +40,29 @@ def main():
         print(f"First frame: {frames[0] if frames else 'none'}")
 
     print()
-    for module in ["gradio", "PIL", "pandas", "numpy", "openai"]:
+    for module in [
+        "gradio",
+        "PIL",
+        "pandas",
+        "numpy",
+        "openai"
+    ]:
         status(f"python module {module}", has_module(module))
+
+    print()
+    status(
+        "optional python module ultralytics",
+        has_module("ultralytics"),
+        "needed only for LOCATOR_BACKEND=yolo_live"
+    )
 
     print()
     print("Runtime configuration:")
     for key in [
         "VLM_BACKEND",
         "LOCATOR_BACKEND",
+        "YOLO_LIVE_MODEL",
+        "YOLO_LIVE_DEVICE",
         "QWEN_VLM_BASE_URL",
         "QWEN_VLM_MODEL",
         "NVIDIA_LOCATE_ANYTHING_BASE_URL",
@@ -58,9 +73,9 @@ def main():
     print()
     print("AMD final-demo recommendation:")
     print("VLM_BACKEND=qwen when Qwen is served on ROCm/vLLM.")
-    print("LOCATOR_BACKEND=labels unless LocateAnything is validated on AMD.")
+    print("LOCATOR_BACKEND=yolo_live when Ultralytics YOLO is installed.")
+    print("LOCATOR_BACKEND=labels remains the deterministic fallback.")
 
 
 if __name__ == "__main__":
     main()
-

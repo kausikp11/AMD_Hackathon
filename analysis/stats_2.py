@@ -1,6 +1,9 @@
 import pandas as pd
+from pathlib import Path
 
-df = pd.read_csv("industrial_analysis.csv")
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
+df = pd.read_csv(ROOT_DIR / "outputs/industrial_analysis.csv")
 
 print(
     pd.crosstab(
@@ -15,7 +18,7 @@ print(
     ].describe()
 )
 
-df = pd.read_csv("industrial_analysis.csv")
+df = pd.read_csv(ROOT_DIR / "outputs/industrial_analysis.csv")
 
 print(
     df.groupby(

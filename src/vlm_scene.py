@@ -1,5 +1,6 @@
 from collections import Counter
 import os
+from PIL import Image
 
 from src.locate_anything import locate_objects
 
@@ -32,7 +33,8 @@ def build_navigation(environment_type):
             "obstacle_regions": [
                 "left",
                 "right"
-            ]
+            ],
+            "desired_path": []
         }
 
     return {
@@ -41,8 +43,176 @@ def build_navigation(environment_type):
         "obstacle_regions": [
             "left",
             "right"
-        ]
+        ],
+        "desired_path": []
     }
+
+
+def estimate_desired_path(image_path, navigation, located_objects):
+
+    with Image.open(image_path) as image:
+        width, height = image.size
+
+    route = navigation.get(
+        "walkable_region",
+        "center"
+    )
+
+    x_ratio = {
+        "left": 0.30,
+        "center": 0.50,
+        "right": 0.70
+    }.get(
+        route,
+        0.50
+    )
+
+    x = width * x_ratio
+    mid_x = x
+
+    human_box = first_human_box(
+        located_objects,
+        (width, height)
+    )
+
+    if human_box:
+        human_center = (
+            human_box[0]
+            + human_box[2]
+        ) / 2
+
+        if abs(human_center - x) < width * 0.18:
+            if human_center >= width / 2:
+                mid_x = width * 0.32
+            else:
+                mid_x = width * 0.68
+
+    vanishing_x = width * 0.50
+
+    return [
+        {
+            "x": vanishing_x,
+            "y": height * 0.96,
+            "speed": 0.0
+        },
+        {
+            "x": (
+                vanishing_x
+                + mid_x
+            ) / 2,
+            "y": height * 0.84,
+            "speed": 0.25
+        },
+        {
+            "x": mid_x,
+            "y": height * 0.74,
+            "speed": 0.45
+        },
+        {
+            "x": mid_x,
+            "y": height * 0.66,
+            "speed": 0.55
+        },
+        {
+            "x": (
+                mid_x
+                + vanishing_x
+            ) / 2,
+            "y": height * 0.58,
+            "speed": 0.65
+        },
+        {
+            "x": vanishing_x,
+            "y": height * 0.52,
+            "speed": 0.75
+        }
+    ]
+
+
+def first_human_box(located_objects, image_size):
+
+    for obj in located_objects:
+
+        if obj.get(
+            "label"
+        ) != "human":
+            continue
+
+        box = bbox_to_pixels(
+            obj.get(
+                "bbox"
+            ),
+            image_size
+        )
+
+        if box:
+            return box
+
+    return None
+
+
+def bbox_to_pixels(bbox, image_size):
+
+    if not bbox:
+        return None
+
+    width, height = image_size
+
+    if all(
+        key in bbox
+        for key in [
+            "x1",
+            "y1",
+            "x2",
+            "y2"
+        ]
+    ):
+        x1 = float(
+            bbox["x1"]
+        )
+        y1 = float(
+            bbox["y1"]
+        )
+        x2 = float(
+            bbox["x2"]
+        )
+        y2 = float(
+            bbox["y2"]
+        )
+    elif all(
+        key in bbox
+        for key in [
+            "cx",
+            "cy",
+            "w",
+            "h"
+        ]
+    ):
+        cx = float(
+            bbox["cx"]
+        ) * width
+        cy = float(
+            bbox["cy"]
+        ) * height
+        bw = float(
+            bbox["w"]
+        ) * width
+        bh = float(
+            bbox["h"]
+        ) * height
+        x1 = cx - bw / 2
+        y1 = cy - bh / 2
+        x2 = cx + bw / 2
+        y2 = cy + bh / 2
+    else:
+        return None
+
+    return [
+        x1,
+        y1,
+        x2,
+        y2
+    ]
 
 
 def build_object_inventory(environment_type):
@@ -232,6 +402,25 @@ def describe_scene(frame, world):
         )
     )
 
+    navigation = (
+        vlm_scene.get(
+            "navigation"
+        )
+        if vlm_scene
+        else build_navigation(
+            environment_type
+        )
+    )
+
+    if not navigation.get(
+        "desired_path"
+    ):
+        navigation["desired_path"] = estimate_desired_path(
+            image_path,
+            navigation,
+            all_located_objects
+        )
+
     scene = {
         "environment_type":
             environment_type,
@@ -254,15 +443,7 @@ def describe_scene(frame, world):
             ),
 
         "navigation":
-            (
-                vlm_scene.get(
-                    "navigation"
-                )
-                if vlm_scene
-                else build_navigation(
-                    environment_type
-                )
-            ),
+            navigation,
 
         "located_objects":
             all_located_objects,
@@ -342,6 +523,8 @@ def qwen_error_scene(exc):
             "walkable_region":
                 "unknown",
             "obstacle_regions":
+                [],
+            "desired_path":
                 []
         },
 

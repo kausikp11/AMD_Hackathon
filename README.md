@@ -14,7 +14,9 @@ Open the URL printed by `start.sh`, usually `http://localhost:7860`.
 The top stream plays all frames as a browser-side canvas stream. The lower controls
 inspect one selected frame through the full copilot pipeline, including boxed
 RGB/thermal views, robot command, world state, risk decision, scene, plan, and
-explanation. Limit the stream/selector with `DEMO_FRAME_COUNT=10` if needed.
+explanation. The selected RGB frame also overlays the estimated desired robot
+path from Qwen when available, or a local aisle-based fallback path otherwise.
+Limit the stream/selector with `DEMO_FRAME_COUNT=10` if needed.
 Use `Play Model-Synced` in the lower controls when you want each inspected
 frame to render only after Qwen/control output is complete.
 
@@ -55,6 +57,31 @@ LOCATOR_BACKEND=labels
 ```
 
 This uses the deterministic local pipeline and dataset RGB/thermal labels. It is the safest mode when only AMD resources are available and LocateAnything has not been validated on ROCm.
+
+## Live YOLO Localization On AMD
+
+If GroundingDINO or NVIDIA LocateAnything are not reliable on the AMD VM, use
+the live YOLO backend:
+
+```bash
+python -m pip install -r requirements-yolo.txt
+VLM_BACKEND=heuristic \
+LOCATOR_BACKEND=yolo_live \
+YOLO_LIVE_MODEL=yolo11n.pt \
+./start.sh
+```
+
+`yolo_live` runs Ultralytics YOLO on the RGB image and returns the same
+`located_objects` shape as the other locators. Stock YOLO maps `person` to
+`human`, so it is useful for live human detection and steering boxes. It is not
+open-vocabulary; industrial classes such as `control_panel`, `workbench`, or
+`industrial_machine` require a custom-trained YOLO model or a separate
+open-vocabulary detector.
+
+When `LOCATOR_BACKEND=yolo_live`, fusion can also use a live YOLO human box to
+set `world["human"]["present"]` if no dataset RGB human label is available.
+Distance remains dataset-derived when available; live YOLO detections currently
+report `distance: null`.
 
 ## Qwen VLM On AMD
 
@@ -134,6 +161,10 @@ rule-based control algorithm.
 - `src/pipeline.py`: end-to-end orchestration.
 - `src/qwen_vlm.py`: Qwen OpenAI-compatible scene backend.
 - `src/locate_anything.py`: LocateAnything adapter plus label fallback.
+- `tests/`: pipeline, module, and backend checks.
+- `analysis/`: dataset analysis and CSV generation utilities.
+- `outputs/`: generated analysis CSVs.
+- `docs/PROJECT_SPEC.md`: project specification and architecture notes.
 - `scripts/check_env.py`: environment and dataset checks.
 - `scripts/run_smoke_tests.sh`: compile, environment, and multi-frame pipeline smoke test.
 - `.env.example`: runtime configuration template.

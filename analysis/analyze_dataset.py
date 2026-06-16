@@ -1,9 +1,14 @@
 import pandas as pd
+from pathlib import Path
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
 
 from src.loader import load_frame, nearest_human
 from src.fusion import fuse_frame
 
-FRAMES_FILE = "data/industrial_subset/frames.txt"
+FRAMES_FILE = ROOT_DIR / "data/industrial_subset/frames.txt"
 
 rows = []
 
@@ -79,7 +84,7 @@ for i, frame_id in enumerate(frame_ids):
 
 df = pd.DataFrame(rows)
 
-output_file = "industrial_analysis.csv"
+output_file = ROOT_DIR / "outputs/industrial_analysis.csv"
 
 df.to_csv(
     output_file,
