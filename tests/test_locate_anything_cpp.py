@@ -1,5 +1,6 @@
 from src.locate_anything import locate_anything_cpp_detections
 from src.locate_anything import locate_anything_cpp_prompt
+from src.locate_anything import locate_anything_cpp_box
 
 
 def test_locate_anything_cpp_prompt_uses_category_separator():
@@ -38,3 +39,39 @@ def test_locate_anything_cpp_detections_parse_json_boxes():
             "source": "locate_anything_cpp"
         }
     ]
+
+
+def test_locate_anything_cpp_detections_can_label_http_source():
+    payload = [
+        {
+            "label": "industrial machine",
+            "bbox": {
+                "x1": 1,
+                "y1": 2,
+                "x2": 3,
+                "y2": 4
+            }
+        }
+    ]
+
+    detections = locate_anything_cpp_detections(
+        payload,
+        ["industrial machine"],
+        source="locate_anything_cpp_http"
+    )
+
+    assert detections[0]["source"] == "locate_anything_cpp_http"
+
+
+def test_locate_anything_cpp_box_parses_dict():
+    assert locate_anything_cpp_box({
+        "x1": "1",
+        "y1": "2",
+        "x2": "3",
+        "y2": "4"
+    }) == {
+        "x1": 1.0,
+        "y1": 2.0,
+        "x2": 3.0,
+        "y2": 4.0
+    }

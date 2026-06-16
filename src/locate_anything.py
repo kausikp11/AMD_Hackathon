@@ -4,6 +4,8 @@ import os
 import re
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,6 +26,7 @@ def locate_objects(frame, object_names=None):
     - yolo_live: run Ultralytics YOLO on the RGB image.
     - grounding_dino: use Hugging Face zero-shot object detection.
     - locate_anything_cpp: use mudler/locate-anything.cpp CLI.
+    - locate_anything_cpp_http: use a persistent local wrapper service.
     - nvidia_vllm: call nvidia/LocateAnything-3B through vLLM/OpenAI API.
     - nvidia_transformers: load nvidia/LocateAnything-3B locally from HF.
     - nvidia: use vLLM if configured, otherwise local Transformers.
@@ -107,6 +110,31 @@ def locate_objects(frame, object_names=None):
                     names
                 ),
                 "locate_anything_cpp",
+                exc
+            )
+
+    if backend in {
+        "locate_anything_cpp_http",
+        "locate_anything_cpp_server"
+    }:
+        try:
+            return locate_with_locate_anything_cpp_http(
+                frame,
+                names
+            )
+        except Exception as exc:
+            if os.getenv(
+                "LOCATE_ANYTHING_CPP_STRICT",
+                "0"
+            ) == "1":
+                raise
+
+            return mark_fallback(
+                locate_from_labels(
+                    frame,
+                    names
+                ),
+                "locate_anything_cpp_http",
                 exc
             )
 
@@ -206,7 +234,7 @@ def locate_with_nvidia_vllm(frame, object_names=None):
 
     located = []
 
-    for name in object_names or DEFAULT_OBJECTS:
+    for name in object_names or load_tracked_objects():
 
         response = client.chat.completions.create(
             model=model,
@@ -271,7 +299,7 @@ def locate_with_nvidia_transformers(frame, object_names=None):
 
     located = []
 
-    for name in object_names or DEFAULT_OBJECTS:
+    for name in object_names or load_tracked_objects():
 
         result = worker.ground_multi(
             image,
@@ -332,7 +360,7 @@ def locate_with_grounding_dino(frame, object_names=None):
     results = detector(
         image,
         candidate_labels=list(
-            object_names or DEFAULT_OBJECTS
+            object_names or load_tracked_objects()
         ),
         threshold=threshold
     )
@@ -490,7 +518,73 @@ def locate_with_locate_anything_cpp(frame, object_names=None):
 
     return locate_anything_cpp_detections(
         payload,
+        object_names,
+        source="locate_anything_cpp"
+    )
+
+
+def locate_with_locate_anything_cpp_http(frame, object_names=None):
+
+    image_path = require_rgb_image(
+        frame
+    )
+    url = os.getenv(
+        "LOCATE_ANYTHING_CPP_URL",
+        "http://127.0.0.1:8188/detect"
+    )
+    prompt = locate_anything_cpp_prompt(
         object_names
+    )
+    body = json.dumps({
+        "image_path":
+            image_path,
+        "prompt":
+            prompt,
+        "object_names":
+            list(
+                object_names or load_tracked_objects()
+            )
+    }).encode(
+        "utf-8"
+    )
+    request = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type":
+                "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(
+            request,
+            timeout=float(
+                os.getenv(
+                    "LOCATE_ANYTHING_CPP_HTTP_TIMEOUT",
+                    "300"
+                )
+            )
+        ) as response:
+            payload = json.loads(
+                response.read().decode(
+                    "utf-8"
+                )
+            )
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(
+            "utf-8",
+            errors="replace"
+        )
+        raise RuntimeError(
+            f"locate-anything.cpp HTTP {exc.code}: {detail}"
+        ) from exc
+
+    return locate_anything_cpp_detections(
+        payload,
+        object_names,
+        source="locate_anything_cpp_http"
     )
 
 
@@ -522,12 +616,22 @@ def locate_anything_cpp_prompt(object_names):
     )
 
 
-def locate_anything_cpp_detections(payload, object_names=None):
+def locate_anything_cpp_detections(
+    payload,
+    object_names=None,
+    source="locate_anything_cpp"
+):
 
-    detections = payload.get(
-        "detections",
-        payload
-    )
+    if isinstance(
+        payload,
+        dict
+    ):
+        detections = payload.get(
+            "detections",
+            payload
+        )
+    else:
+        detections = payload
 
     if not isinstance(
         detections,
@@ -595,7 +699,7 @@ def locate_anything_cpp_detections(payload, object_names=None):
                 ),
 
             "source":
-                "locate_anything_cpp"
+                source
         })
 
     return located

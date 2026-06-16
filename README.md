@@ -182,6 +182,31 @@ The CLI prompt is built from `config/tracked_objects.json`; categories are
 separated with `</c>` as required by locate-anything.cpp. Use
 `LOCATE_ANYTHING_CPP_STRICT=1` to fail instead of falling back to dataset labels.
 
+For repeated local runs, start the lightweight wrapper service. It caches
+detections by model, mode, image path, image mtime, and prompt:
+
+```bash
+python scripts/locate_anything_cpp_server.py \
+  --bin /workspace/locate-anything.cpp/build/examples/cli/locate-anything-cli \
+  --model /workspace/locate-anything.cpp/models/locate-anything-q8_0.gguf \
+  --mode fast \
+  --host 127.0.0.1 \
+  --port 8188
+```
+
+Then use:
+
+```bash
+LOCATOR_BACKEND=locate_anything_cpp_http \
+LOCATE_ANYTHING_CPP_URL=http://127.0.0.1:8188/detect \
+./start.sh
+```
+
+This wrapper avoids recomputing frames it has already seen. For maximum
+throughput on never-before-seen frames, use a native C-API server that keeps the
+GGUF model loaded in memory; the current wrapper is an integration-safe bridge
+around the CLI.
+
 To cache Qwen plus locate-anything.cpp overlays for the top stream:
 
 ```bash
