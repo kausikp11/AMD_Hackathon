@@ -1,6 +1,9 @@
 import base64
+import json
 import os
 import re
+import subprocess
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 
@@ -20,6 +23,7 @@ def locate_objects(frame, object_names=None):
     - yolo_labels/yolo: use dataset YOLO RGB/thermal labels.
     - yolo_live: run Ultralytics YOLO on the RGB image.
     - grounding_dino: use Hugging Face zero-shot object detection.
+    - locate_anything_cpp: use mudler/locate-anything.cpp CLI.
     - nvidia_vllm: call nvidia/LocateAnything-3B through vLLM/OpenAI API.
     - nvidia_transformers: load nvidia/LocateAnything-3B locally from HF.
     - nvidia: use vLLM if configured, otherwise local Transformers.
@@ -78,6 +82,31 @@ def locate_objects(frame, object_names=None):
                     names
                 ),
                 "grounding_dino",
+                exc
+            )
+
+    if backend in {
+        "locate_anything_cpp",
+        "locate_anything_cpp_cli"
+    }:
+        try:
+            return locate_with_locate_anything_cpp(
+                frame,
+                names
+            )
+        except Exception as exc:
+            if os.getenv(
+                "LOCATE_ANYTHING_CPP_STRICT",
+                "0"
+            ) == "1":
+                raise
+
+            return mark_fallback(
+                locate_from_labels(
+                    frame,
+                    names
+                ),
+                "locate_anything_cpp",
                 exc
             )
 
@@ -373,6 +402,263 @@ def locate_with_grounding_dino(frame, object_names=None):
         })
 
     return located
+
+
+def locate_with_locate_anything_cpp(frame, object_names=None):
+
+    image_path = require_rgb_image(
+        frame
+    )
+
+    model = os.getenv(
+        "LOCATE_ANYTHING_CPP_MODEL"
+    )
+
+    if not model:
+        raise RuntimeError(
+            "LOCATE_ANYTHING_CPP_MODEL must point to a GGUF model file."
+        )
+
+    binary = os.getenv(
+        "LOCATE_ANYTHING_CPP_BIN",
+        "locate-anything-cli"
+    )
+    mode = os.getenv(
+        "LOCATE_ANYTHING_CPP_MODE",
+        "hybrid"
+    )
+    threads = os.getenv(
+        "LOCATE_ANYTHING_CPP_THREADS"
+    )
+    prompt = locate_anything_cpp_prompt(
+        object_names
+    )
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".json",
+        delete=False
+    ) as output_file:
+        output_path = Path(
+            output_file.name
+        )
+
+    cmd = [
+        binary,
+        "detect",
+        "--model",
+        model,
+        "--input",
+        image_path,
+        "--prompt",
+        prompt,
+        "--mode",
+        mode,
+        "--output",
+        str(
+            output_path
+        )
+    ]
+
+    if threads:
+        cmd.extend([
+            "--threads",
+            threads
+        ])
+
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or f"{binary} exited with {result.returncode}"
+            )
+
+        payload = json.loads(
+            output_path.read_text()
+        )
+    finally:
+        output_path.unlink(
+            missing_ok=True
+        )
+
+    return locate_anything_cpp_detections(
+        payload,
+        object_names
+    )
+
+
+def locate_anything_cpp_prompt(object_names):
+
+    names = object_names or load_tracked_objects()
+
+    prompt_labels = [
+        name.replace(
+            "_",
+            " "
+        )
+        for name in names
+        if normalize_label(
+            name
+        ) not in {
+            "floor",
+            "aisle",
+            "walkway"
+        }
+    ]
+
+    return (
+        "Locate all the instances that matches the following description: "
+        + "</c>".join(
+            prompt_labels
+        )
+        + "."
+    )
+
+
+def locate_anything_cpp_detections(payload, object_names=None):
+
+    detections = payload.get(
+        "detections",
+        payload
+    )
+
+    if not isinstance(
+        detections,
+        list
+    ):
+        raise RuntimeError(
+            "locate-anything.cpp output did not contain a detections list."
+        )
+
+    tracked = normalize_tracked_names(
+        object_names
+    )
+    located = []
+
+    for det in detections:
+
+        if not isinstance(
+            det,
+            dict
+        ):
+            continue
+
+        label = normalize_label(
+            det.get(
+                "label",
+                "unknown"
+            )
+        )
+
+        if tracked is not None and label not in tracked:
+            continue
+
+        box = det.get(
+            "box",
+            det.get(
+                "bbox"
+            )
+        )
+        bbox = locate_anything_cpp_box(
+            box
+        )
+
+        if bbox is None:
+            continue
+
+        located.append({
+            "label":
+                label,
+
+            "bbox":
+                bbox,
+
+            "distance":
+                None,
+
+            "confidence":
+                float(
+                    det.get(
+                        "confidence",
+                        det.get(
+                            "score",
+                            1.0
+                        )
+                    )
+                ),
+
+            "source":
+                "locate_anything_cpp"
+        })
+
+    return located
+
+
+def locate_anything_cpp_box(box):
+
+    if isinstance(
+        box,
+        dict
+    ):
+        if all(
+            key in box
+            for key in [
+                "x1",
+                "y1",
+                "x2",
+                "y2"
+            ]
+        ):
+            return {
+                "x1":
+                    float(
+                        box["x1"]
+                    ),
+                "y1":
+                    float(
+                        box["y1"]
+                    ),
+                "x2":
+                    float(
+                        box["x2"]
+                    ),
+                "y2":
+                    float(
+                        box["y2"]
+                    )
+            }
+
+    if isinstance(
+        box,
+        list
+    ) and len(box) >= 4:
+        return {
+            "x1":
+                float(
+                    box[0]
+                ),
+            "y1":
+                float(
+                    box[1]
+                ),
+            "x2":
+                float(
+                    box[2]
+                ),
+            "y2":
+                float(
+                    box[3]
+                )
+        }
+
+    return None
 
 
 def locate_with_yolo_live(frame, object_names=None):

@@ -273,7 +273,7 @@ def live_stream_html():
       ctx.fillStyle = "#050608";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      if (!img.complete || !img.naturalWidth) return;
+      if (!img.complete || !img.naturalWidth) return null;
 
       const scale = Math.min(
         canvas.width / img.naturalWidth,
@@ -285,6 +285,222 @@ def live_stream_html():
       const y = (canvas.height - height) / 2;
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(img, x, y, width, height);
+      return {{ scale, x, y, width, height, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight }};
+    }}
+
+    function drawFrame(ctx, canvas, img, record, target) {{
+      const transform = drawContain(ctx, canvas, img);
+      if (!transform || !record) return;
+      const navigation = record.navigation || {{}};
+      if (target === "rgb") {{
+        drawFloor(ctx, transform, navigation.floor_region || []);
+      }}
+      drawDetections(ctx, transform, record.located_objects || [], target);
+      if (target === "rgb") {{
+        drawPath(ctx, transform, navigation.desired_path || [], navigation.floor_region || []);
+      }}
+    }}
+
+    function toCanvasPoint(transform, point) {{
+      let px = Number(point.x);
+      let py = Number(point.y);
+      if (px >= 0 && px <= 1 && py >= 0 && py <= 1) {{
+        px *= transform.naturalWidth;
+        py *= transform.naturalHeight;
+      }}
+      return {{
+        x: transform.x + px * transform.scale,
+        y: transform.y + py * transform.scale,
+        speed: point.speed === null || point.speed === undefined ? 0 : Number(point.speed)
+      }};
+    }}
+
+    function polygonPoints(transform, polygon) {{
+      return polygon
+        .filter((point) => point && point.x !== undefined && point.y !== undefined)
+        .map((point) => toCanvasPoint(transform, point));
+    }}
+
+    function drawFloor(ctx, transform, floorRegion) {{
+      const points = polygonPoints(transform, floorRegion);
+      if (points.length < 3) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(0, 180, 255, 0.11)";
+      ctx.strokeStyle = "rgba(0, 180, 255, 0.45)";
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }}
+
+    function bboxToCanvas(transform, bbox) {{
+      if (!bbox) return null;
+      let x1, y1, x2, y2;
+      if (bbox.x1 !== undefined && bbox.y1 !== undefined && bbox.x2 !== undefined && bbox.y2 !== undefined) {{
+        x1 = Number(bbox.x1);
+        y1 = Number(bbox.y1);
+        x2 = Number(bbox.x2);
+        y2 = Number(bbox.y2);
+      }} else if (bbox.cx !== undefined && bbox.cy !== undefined && bbox.w !== undefined && bbox.h !== undefined) {{
+        const cx = Number(bbox.cx) * transform.naturalWidth;
+        const cy = Number(bbox.cy) * transform.naturalHeight;
+        const bw = Number(bbox.w) * transform.naturalWidth;
+        const bh = Number(bbox.h) * transform.naturalHeight;
+        x1 = cx - bw / 2;
+        y1 = cy - bh / 2;
+        x2 = cx + bw / 2;
+        y2 = cy + bh / 2;
+      }} else {{
+        return null;
+      }}
+      return {{
+        x1: transform.x + x1 * transform.scale,
+        y1: transform.y + y1 * transform.scale,
+        x2: transform.x + x2 * transform.scale,
+        y2: transform.y + y2 * transform.scale
+      }};
+    }}
+
+    function shouldDrawDetection(det, target) {{
+      const source = det.source || "unknown";
+      const thermalSources = new Set(["thermal", "thermal_fallback", "yolo_thermal", "yolo_thermal_fallback"]);
+      if (target === "thermal") return thermalSources.has(source);
+      return !thermalSources.has(source);
+    }}
+
+    function sourceColor(source) {{
+      if (source === "grounding_dino") return "#56b4e9";
+      if (source === "locate_anything_cpp") return "#00c2a8";
+      if (source === "qwen_vlm") return "#cc79ff";
+      if (source && source.includes("thermal")) return "#d55e00";
+      if (source && (source.includes("rgb") || source.includes("yolo_live"))) return "#f0e442";
+      return "#cc79a7";
+    }}
+
+    function sourceLabel(source) {{
+      const labels = {{
+        grounding_dino: "DINO",
+        locate_anything_cpp: "LA.cpp",
+        qwen_vlm: "Qwen",
+        yolo_rgb: "YOLO RGB",
+        yolo_rgb_fallback: "YOLO RGB fallback",
+        yolo_thermal: "YOLO thermal",
+        yolo_thermal_fallback: "YOLO thermal fallback",
+        yolo_live: "YOLO live",
+        rgb: "RGB label",
+        thermal: "Thermal label"
+      }};
+      return labels[source] || source || "unknown";
+    }}
+
+    function drawDetections(ctx, transform, detections, target) {{
+      for (const det of detections) {{
+        if (!shouldDrawDetection(det, target)) continue;
+        const box = bboxToCanvas(transform, det.bbox);
+        if (!box) continue;
+        const color = sourceColor(det.source);
+        const label = `${{det.label || "object"}} [${{sourceLabel(det.source)}}]`;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+        ctx.font = "13px ui-sans-serif, system-ui";
+        const textWidth = ctx.measureText(label).width;
+        const textHeight = 16;
+        ctx.fillStyle = color;
+        ctx.fillRect(box.x1, box.y1 - textHeight - 4, textWidth + 8, textHeight + 4);
+        ctx.fillStyle = "#000";
+        ctx.fillText(label, box.x1 + 4, box.y1 - 6);
+        ctx.restore();
+      }}
+    }}
+
+    function speedColor(speed) {{
+      const value = Math.max(0, Math.min(1, Number(speed) || 0));
+      if (value < 0.5) {{
+        const ratio = value / 0.5;
+        return `rgb(220, ${{Math.round(64 + 176 * ratio)}}, 0)`;
+      }}
+      const ratio = (value - 0.5) / 0.5;
+      return `rgb(${{Math.round(220 - 220 * ratio)}}, 220, 0)`;
+    }}
+
+    function pathHalfWidth(point, transform) {{
+      const imageY = (point.y - transform.y) / transform.scale;
+      const ratio = Math.max(0, Math.min(1, (imageY / transform.naturalHeight - 0.5) / 0.46));
+      return (10 + 34 * ratio) * transform.scale;
+    }}
+
+    function drawStopPoint(ctx, point, transform) {{
+      const radius = pathHalfWidth(point, transform) * 0.45;
+      ctx.save();
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius + 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = speedColor(point.speed);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }}
+
+    function drawPath(ctx, transform, path, floorRegion) {{
+      const points = path
+        .filter((point) => point && point.x !== undefined && point.y !== undefined)
+        .map((point) => toCanvasPoint(transform, point));
+      if (points.length === 1) {{
+        drawStopPoint(ctx, points[0], transform);
+        return;
+      }}
+      if (points.length < 2) return;
+      const floor = polygonPoints(transform, floorRegion);
+      ctx.save();
+      if (floor.length >= 3) {{
+        ctx.beginPath();
+        ctx.moveTo(floor[0].x, floor[0].y);
+        for (const point of floor.slice(1)) ctx.lineTo(point.x, point.y);
+        ctx.closePath();
+        ctx.clip();
+      }}
+      for (let i = 0; i < points.length - 1; i++) {{
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const speed = (p1.speed + p2.speed) / 2;
+        ctx.strokeStyle = speedColor(speed);
+        ctx.globalAlpha = 0.42;
+        ctx.lineWidth = Math.max(pathHalfWidth(p1, transform), pathHalfWidth(p2, transform)) * 2;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }}
+      ctx.restore();
+      drawStopPoint(ctx, points[0], transform);
+      const end = points[points.length - 1];
+      ctx.save();
+      ctx.fillStyle = speedColor(end.speed);
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(end.x, end.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }}
 
     function show(i) {{
@@ -293,24 +509,26 @@ def live_stream_html():
       const frame = frames[index];
       const rgb = loadImage(frame.rgb);
       const thermal = loadImage(frame.thermal);
+      const qwen = qwenRecords[frame.id];
 
-      drawContain(rgbCtx, rgbCanvas, rgb);
-      drawContain(thermalCtx, thermalCanvas, thermal);
+      drawFrame(rgbCtx, rgbCanvas, rgb, qwen, "rgb");
+      drawFrame(thermalCtx, thermalCanvas, thermal, qwen, "thermal");
 
-      if (!rgb.complete) rgb.onload = () => drawContain(rgbCtx, rgbCanvas, rgb);
-      if (!thermal.complete) thermal.onload = () => drawContain(thermalCtx, thermalCanvas, thermal);
+      if (!rgb.complete) rgb.onload = () => drawFrame(rgbCtx, rgbCanvas, rgb, qwen, "rgb");
+      if (!thermal.complete) thermal.onload = () => drawFrame(thermalCtx, thermalCanvas, thermal, qwen, "thermal");
 
       timeline.value = index;
       status.textContent = `Realtime stream | Frame ${{index + 1}}/${{frames.length}} | ID ${{frame.id}}`;
-      const qwen = qwenRecords[frame.id];
       if (qwen) {{
         const distance = qwen.human_distance === null || qwen.human_distance === undefined
           ? "n/a"
           : `${{Number(qwen.human_distance).toFixed(2)}} m`;
+        const nav = qwen.navigation || {{}};
         qwenStatus.textContent =
           `Qwen/cache | Scene ${{qwen.scene_source}} | Risk ${{qwen.risk_level}} | ` +
           `Action ${{qwen.action}} | Human ${{qwen.human_present}} | ` +
-          `Distance ${{distance}} | Objects ${{qwen.located_count}}`;
+          `Distance ${{distance}} | Objects ${{qwen.located_count}} | ` +
+          `Path ${{nav.desired_path_source || "unknown"}} | Floor ${{nav.floor_region_source || "unknown"}}`;
       }} else {{
         qwenStatus.textContent =
           "Qwen/cache | no cached output for this frame. Run scripts/cache_qwen_outputs.py to sync model output with the stream.";

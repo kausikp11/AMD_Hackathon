@@ -148,8 +148,8 @@ Return JSON with this exact shape:
     ],
     "desired_path": [
       {"x": 320, "y": 490, "speed": 0.0},
-      {"x": 300, "y": 390, "speed": 0.25},
-      {"x": 320, "y": 270, "speed": 0.5}
+      {"x": 280, "y": 390, "speed": 0.25},
+      {"x": 240, "y": 270, "speed": 0.5}
     ]
   },
   "located_objects": [
@@ -170,6 +170,9 @@ Keep the path inside image bounds, below the floor horizon, and away from
 visible humans and obstacles. Do not place path points on walls, machines, or
 other vertical surfaces. Include speed at each point as a normalized target
 speed from 0.0 stopped, through 0.5 cautious, to 1.0 normal speed.
+Do not force the final waypoint to the image center. Continue the path along
+the visible lane that gives the robot the most clearance from humans and
+obstacles.
 Estimate floor_region as a polygon around the visible traversable floor or
 ground plane. Use 4 to 8 pixel points in image coordinates. Exclude machines,
 walls, tables, people, shelves, and vertical surfaces. If the floor is unclear,

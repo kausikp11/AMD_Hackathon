@@ -111,12 +111,20 @@ def estimate_desired_path(image_path, navigation, located_objects):
             human_box[0]
             + human_box[2]
         ) / 2
+        human_ratio = human_center / width
 
-        if abs(human_center - x) < width * 0.18:
-            if human_center >= width / 2:
-                mid_x = width * 0.32
-            else:
-                mid_x = width * 0.68
+        if human_ratio >= 0.56:
+            x = width * 0.34
+            mid_x = x
+        elif human_ratio <= 0.44:
+            x = width * 0.66
+            mid_x = x
+        elif human_center >= width / 2:
+            x = width * 0.34
+            mid_x = x
+        else:
+            x = width * 0.66
+            mid_x = x
 
     vanishing_x = width * 0.50
 
@@ -147,13 +155,13 @@ def estimate_desired_path(image_path, navigation, located_objects):
         {
             "x": (
                 mid_x
-                + vanishing_x
+                + x
             ) / 2,
             "y": height * 0.58,
             "speed": 0.65
         },
         {
-            "x": vanishing_x,
+            "x": x,
             "y": height * 0.52,
             "speed": 0.75
         }

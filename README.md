@@ -132,6 +132,22 @@ NVIDIA_LOCATE_ANYTHING_ATTN_IMPLEMENTATION=sdpa \
 ./start.sh
 ```
 
+## locate-anything.cpp
+
+The project also supports the `mudler/locate-anything.cpp` CLI backend:
+
+```bash
+LOCATOR_BACKEND=locate_anything_cpp \
+LOCATE_ANYTHING_CPP_BIN=/path/to/locate-anything-cli \
+LOCATE_ANYTHING_CPP_MODEL=/path/to/locate-anything-q8_0.gguf \
+LOCATE_ANYTHING_CPP_MODE=hybrid \
+./start.sh
+```
+
+The CLI prompt is built from `config/tracked_objects.json`; categories are
+separated with `</c>` as required by locate-anything.cpp. Use
+`LOCATE_ANYTHING_CPP_STRICT=1` to fail instead of falling back to dataset labels.
+
 ## GroundingDINO Localization
 
 GroundingDINO can be used as a LocateAnything-style open-vocabulary locator:

@@ -71,6 +71,16 @@ def compact(frame_id, result):
                     []
                 )
             ),
+        "located_objects":
+            scene.get(
+                "located_objects",
+                []
+            ),
+        "navigation":
+            plan.get(
+                "navigation",
+                {}
+            ),
         "reasoning":
             decision["reasoning"],
     }
