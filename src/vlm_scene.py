@@ -97,7 +97,10 @@ def estimate_desired_path(image_path, navigation, located_objects):
     if route in {
         "left",
         "right"
-    }:
+    } and not has_navigation_boxes(
+        located_objects,
+        (width, height)
+    ):
         lane = route
 
     lane_x = {
@@ -306,6 +309,25 @@ def blocks_navigation(obj):
         "robot",
         "obstacle"
     }
+
+
+def has_navigation_boxes(located_objects, image_size):
+
+    for obj in located_objects:
+        if not blocks_navigation(
+            obj
+        ):
+            continue
+
+        if bbox_to_pixels(
+            obj.get(
+                "bbox"
+            ),
+            image_size
+        ):
+            return True
+
+    return False
 
 
 def bbox_to_pixels(bbox, image_size):
@@ -577,7 +599,23 @@ def describe_scene(frame, world):
         )
         navigation["floor_region_source"] = "heuristic_floor_projection"
 
-    if not navigation.get(
+    path_backend = os.getenv(
+        "PATH_PLANNER_BACKEND",
+        "free_space"
+    ).lower()
+
+    if path_backend in {
+        "free_space",
+        "heuristic",
+        "local"
+    }:
+        navigation["desired_path"] = estimate_desired_path(
+            image_path,
+            navigation,
+            all_located_objects
+        )
+        navigation["desired_path_source"] = "free_space_lane_planner"
+    elif not navigation.get(
         "desired_path"
     ):
         navigation["desired_path"] = estimate_desired_path(

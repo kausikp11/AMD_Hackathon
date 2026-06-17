@@ -1,5 +1,6 @@
 from src.vlm_scene import choose_best_lane
 from src.vlm_scene import estimate_desired_path
+from src.vlm_scene import has_navigation_boxes
 
 
 IMAGE_SIZE = (
@@ -88,6 +89,56 @@ def test_left_and_center_blocked_moves_right():
         located,
         IMAGE_SIZE
     ) == "right"
+
+
+def test_route_hint_does_not_override_detected_free_space(tmp_path):
+    image_path = tmp_path / "frame.jpg"
+
+    from PIL import Image
+
+    Image.new(
+        "RGB",
+        IMAGE_SIZE
+    ).save(
+        image_path
+    )
+
+    located = [
+        {
+            "label": "human",
+            "bbox": {
+                "x1": 260,
+                "y1": 120,
+                "x2": 370,
+                "y2": 500
+            }
+        },
+        {
+            "label": "cart",
+            "bbox": {
+                "x1": 390,
+                "y1": 220,
+                "x2": 520,
+                "y2": 500
+            }
+        }
+    ]
+
+    assert has_navigation_boxes(
+        located,
+        IMAGE_SIZE
+    )
+
+    path = estimate_desired_path(
+        image_path,
+        {
+            "walkable_region":
+                "right"
+        },
+        located
+    )
+
+    assert path[-1]["x"] < 320
 
 
 def test_desired_path_curves_left_when_left_is_freer(tmp_path):
