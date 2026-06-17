@@ -1563,12 +1563,14 @@ def robot_command_text(world, decision, plan, scene):
     elif action == "SLOW_DOWN":
         command = "SLOWING DOWN"
         steering = steering_from_human_box(
-            located
+            located,
+            scene
         )
     elif action == "PROCEED_WITH_CAUTION":
         command = "CAUTIOUS FORWARD"
         steering = steering_from_human_box(
-            located
+            located,
+            scene
         )
     else:
         command = "MOVING FORWARD"
@@ -1576,7 +1578,8 @@ def robot_command_text(world, decision, plan, scene):
 
     if human["present"] and action != "STOP":
         steering = steering_from_human_box(
-            located
+            located,
+            scene
         )
 
     return (
@@ -1592,7 +1595,11 @@ def robot_command_text(world, decision, plan, scene):
     )
 
 
-def steering_from_human_box(located_objects):
+def steering_from_human_box(located_objects, scene=None):
+
+    image_width = estimate_scene_width(
+        scene or {}
+    )
 
     for obj in located_objects:
 
@@ -1619,7 +1626,7 @@ def steering_from_human_box(located_objects):
                 )
             ) / 2
             if cx > 1:
-                return "turn left around obstacle"
+                cx = cx / image_width
         else:
             continue
 
@@ -1632,6 +1639,43 @@ def steering_from_human_box(located_objects):
         return "slow center approach"
 
     return "center aisle"
+
+
+def estimate_scene_width(scene):
+
+    floor_region = (
+        scene.get(
+            "navigation",
+            {}
+        ).get(
+            "floor_region",
+            []
+        )
+    )
+
+    xs = [
+        float(
+            point.get(
+                "x",
+                0
+            )
+        )
+        for point in floor_region
+        if isinstance(
+            point,
+            dict
+        )
+    ]
+
+    if xs:
+        return max(
+            1.0,
+            max(
+                xs
+            ) / 0.94
+        )
+
+    return 640.0
 
 
 def analyze_frame_id(frame_id):

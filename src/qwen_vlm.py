@@ -166,6 +166,10 @@ carts, cabinets, boxes, forklifts, pipes, obstacles, and navigable aisles.
 Estimate desired_path as 3 to 6 pixel waypoints on the visible floor or ground
 plane. The first point should be near the robot at the bottom of the image,
 and later points should move through the safest visible aisle or free space.
+Plan the path by comparing free space on the left, center, and right of the
+visible floor. If the center lane is clear, prefer a straight center path. If
+the center is blocked, curve toward the side with more visible clearance. If
+the left side is blocked, curve right; if the right side is blocked, curve left.
 Keep the path inside image bounds, below the floor horizon, and away from
 visible humans and obstacles. Do not place path points on walls, machines, or
 other vertical surfaces. Include speed at each point as a normalized target

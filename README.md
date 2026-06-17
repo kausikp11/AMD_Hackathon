@@ -102,7 +102,8 @@ Serve Qwen on the AMD resource using the helper:
 ```
 
 If the AMD image has the known vLLM dependency mismatch, the helper prints the
-repair command. You can run the bundled repair explicitly:
+environment alignment command. You can run the bundled alignment script
+explicitly:
 
 ```bash
 ./scripts/fix_amd_vllm_env.sh

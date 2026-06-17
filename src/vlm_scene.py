@@ -84,99 +84,115 @@ def estimate_desired_path(image_path, navigation, located_objects):
     with Image.open(image_path) as image:
         width, height = image.size
 
+    lane = choose_best_lane(
+        located_objects,
+        (width, height)
+    )
+
     route = navigation.get(
         "walkable_region",
         "center"
     )
 
-    x_ratio = {
-        "left": 0.30,
-        "center": 0.50,
-        "right": 0.70
-    }.get(
-        route,
-        0.50
-    )
+    if route in {
+        "left",
+        "right"
+    }:
+        lane = route
 
-    x = width * x_ratio
-    mid_x = x
-
-    human_box = first_human_box(
-        located_objects,
-        (width, height)
-    )
-
-    if human_box:
-        human_center = (
-            human_box[0]
-            + human_box[2]
-        ) / 2
-        human_ratio = human_center / width
-
-        if human_ratio >= 0.56:
-            x = width * 0.34
-            mid_x = x
-        elif human_ratio <= 0.44:
-            x = width * 0.66
-            mid_x = x
-        elif human_center >= width / 2:
-            x = width * 0.34
-            mid_x = x
-        else:
-            x = width * 0.66
-            mid_x = x
+    lane_x = {
+        "left": width * 0.34,
+        "center": width * 0.50,
+        "right": width * 0.66
+    }[lane]
 
     vanishing_x = width * 0.50
+    start_x = vanishing_x
+    control_x = (
+        start_x * 0.35
+        + lane_x * 0.65
+    )
+    end_x = (
+        lane_x * 0.75
+        + vanishing_x * 0.25
+    )
+
+    y_ratios = [
+        0.96,
+        0.84,
+        0.74,
+        0.66,
+        0.58,
+        0.52
+    ]
+    speeds = [
+        0.0,
+        0.25,
+        0.45,
+        0.55,
+        0.65,
+        0.75
+    ]
 
     return [
         {
-            "x": vanishing_x,
-            "y": height * 0.96,
-            "speed": 0.0
-        },
-        {
-            "x": (
-                vanishing_x
-                + mid_x
-            ) / 2,
-            "y": height * 0.84,
-            "speed": 0.25
-        },
-        {
-            "x": mid_x,
-            "y": height * 0.74,
-            "speed": 0.45
-        },
-        {
-            "x": mid_x,
-            "y": height * 0.66,
-            "speed": 0.55
-        },
-        {
-            "x": (
-                mid_x
-                + x
-            ) / 2,
-            "y": height * 0.58,
-            "speed": 0.65
-        },
-        {
-            "x": x,
-            "y": height * 0.52,
-            "speed": 0.75
+            "x": bezier_x(
+                start_x,
+                control_x,
+                end_x,
+                index / (len(y_ratios) - 1)
+            ),
+            "y": height * y_ratio,
+            "speed": speeds[index]
         }
+        for index, y_ratio in enumerate(
+            y_ratios
+        )
     ]
 
 
-def first_human_box(located_objects, image_size):
+def bezier_x(start_x, control_x, end_x, ratio):
+
+    inverse = 1.0 - ratio
+
+    return (
+        inverse
+        * inverse
+        * start_x
+        + 2
+        * inverse
+        * ratio
+        * control_x
+        + ratio
+        * ratio
+        * end_x
+    )
+
+
+def choose_best_lane(located_objects, image_size):
+
+    width, height = image_size
+    lanes = {
+        "left": (
+            0.16,
+            0.43
+        ),
+        "center": (
+            0.34,
+            0.66
+        ),
+        "right": (
+            0.57,
+            0.84
+        )
+    }
+    scores = {
+        "left": 0.0,
+        "center": 0.0,
+        "right": 0.0
+    }
 
     for obj in located_objects:
-
-        if obj.get(
-            "label"
-        ) != "human":
-            continue
-
         box = bbox_to_pixels(
             obj.get(
                 "bbox"
@@ -184,10 +200,112 @@ def first_human_box(located_objects, image_size):
             image_size
         )
 
-        if box:
-            return box
+        if not box or not blocks_navigation(
+            obj
+        ):
+            continue
 
-    return None
+        x1, y1, x2, y2 = box
+        x1_ratio = max(
+            0.0,
+            min(
+                1.0,
+                x1 / width
+            )
+        )
+        x2_ratio = max(
+            0.0,
+            min(
+                1.0,
+                x2 / width
+            )
+        )
+        vertical_weight = max(
+            0.25,
+            min(
+                1.0,
+                y2 / height
+            )
+        )
+        label_weight = 1.8 if obj.get(
+            "label"
+        ) == "human" else 1.0
+
+        for lane, bounds in lanes.items():
+            overlap = interval_overlap(
+                (
+                    x1_ratio,
+                    x2_ratio
+                ),
+                bounds
+            )
+            lane_width = bounds[1] - bounds[0]
+            if overlap > 0:
+                scores[lane] += (
+                    overlap
+                    / lane_width
+                    * vertical_weight
+                    * label_weight
+                )
+
+    return min(
+        [
+            "center",
+            "left",
+            "right"
+        ],
+        key=lambda lane: (
+            scores[lane],
+            lane != "center"
+        )
+    )
+
+
+def interval_overlap(first, second):
+
+    return max(
+        0.0,
+        min(
+            first[1],
+            second[1]
+        )
+        - max(
+            first[0],
+            second[0]
+        )
+    )
+
+
+def blocks_navigation(obj):
+
+    label = normalize_label(
+        obj.get(
+            "label",
+            ""
+        )
+    )
+
+    return label in {
+        "human",
+        "person",
+        "industrial_machine",
+        "machine",
+        "workbench",
+        "cart",
+        "cabinet",
+        "storage_box",
+        "box",
+        "crate",
+        "pallet",
+        "shelf",
+        "rack",
+        "safety_cone",
+        "barrel",
+        "toolbox",
+        "forklift",
+        "robot",
+        "obstacle"
+    }
 
 
 def bbox_to_pixels(bbox, image_size):
