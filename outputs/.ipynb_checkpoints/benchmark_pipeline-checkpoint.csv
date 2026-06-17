@@ -1,0 +1,11 @@
+frame_id,locator_backend,vlm_backend,scene_source,risk_level,action,target_speed,locator_seconds,pipeline_seconds,located_count,pipeline_located_count,path_source,floor_source
+013342,locate_anything_cpp_http,qwen,qwen_vlm,HIGH,SLOW_DOWN,0.25,4.7682,6.6231,4,5,qwen_vlm,qwen_vlm
+013352,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,4.7258,2.3925,4,5,qwen_vlm,qwen_vlm
+013362,locate_anything_cpp_http,qwen,qwen_vlm,LOW,CONTINUE,1.0,4.6049,1.9846,4,4,qwen_vlm,qwen_vlm
+013372,locate_anything_cpp_http,qwen,qwen_vlm,LOW,CONTINUE,1.0,4.5703,2.4388,3,4,qwen_vlm,qwen_vlm
+013382,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,4.6838,2.5688,6,7,qwen_vlm,qwen_vlm
+013392,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,5.0267,2.5047,3,4,qwen_vlm,qwen_vlm
+013402,locate_anything_cpp_http,qwen,qwen_vlm,HIGH,SLOW_DOWN,0.25,5.0477,2.7066,6,8,qwen_vlm,qwen_vlm
+013412,locate_anything_cpp_http,qwen,qwen_vlm,HIGH,SLOW_DOWN,0.25,5.0445,2.4044,2,3,qwen_vlm,qwen_vlm
+013422,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,4.9435,2.4929,2,3,qwen_vlm,qwen_vlm
+013432,locate_anything_cpp_http,qwen,qwen_vlm,LOW,CONTINUE,1.0,4.9555,2.1156,5,5,qwen_vlm,qwen_vlm

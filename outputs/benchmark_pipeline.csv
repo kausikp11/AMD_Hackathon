@@ -1,0 +1,11 @@
+frame_id,locator_backend,vlm_backend,scene_source,risk_level,action,target_speed,locator_seconds,locator_cold_seconds,locator_cached_seconds,pipeline_non_locator_seconds,estimated_cold_e2e_seconds,pipeline_seconds,located_count,cached_located_count,pipeline_located_count,path_source,floor_source
+013342,locate_anything_cpp_http,qwen,qwen_vlm,HIGH,SLOW_DOWN,0.25,4.8669,4.8669,0.0027,2.1984,7.0653,2.2011,4,4,5,free_space_lane_planner,qwen_vlm
+013352,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,5.2125,5.2125,0.0024,1.716,6.9285,1.7184,4,4,5,free_space_lane_planner,qwen_vlm
+013362,locate_anything_cpp_http,qwen,qwen_vlm,LOW,CONTINUE,1.0,5.213,5.213,0.0019,1.3658,6.5788,1.3677,4,4,4,free_space_lane_planner,qwen_vlm
+013372,locate_anything_cpp_http,qwen,qwen_vlm,LOW,CONTINUE,1.0,5.1345,5.1345,0.0022,1.3597,6.4942,1.3619,3,3,3,free_space_lane_planner,qwen_vlm
+013382,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,5.2192,5.2192,0.0025,2.1734,7.3926,2.1759,6,6,7,free_space_lane_planner,qwen_vlm
+013392,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,5.1695,5.1695,0.0024,1.7096,6.8791,1.712,3,3,4,free_space_lane_planner,qwen_vlm
+013402,locate_anything_cpp_http,qwen,qwen_vlm,HIGH,SLOW_DOWN,0.25,5.2641,5.2641,0.0018,1.9735,7.2376,1.9752,6,6,8,free_space_lane_planner,qwen_vlm
+013412,locate_anything_cpp_http,qwen,qwen_vlm,HIGH,SLOW_DOWN,0.25,5.1168,5.1168,0.0018,1.7216,6.8384,1.7234,2,2,3,free_space_lane_planner,qwen_vlm
+013422,locate_anything_cpp_http,qwen,qwen_vlm,CRITICAL,STOP,0.0,5.0716,5.0716,0.0025,1.3545,6.4261,1.357,2,2,2,free_space_lane_planner,qwen_vlm
+013432,locate_anything_cpp_http,qwen,qwen_vlm,LOW,CONTINUE,1.0,5.3457,5.3457,0.0029,1.3535,6.6992,1.3564,5,5,5,free_space_lane_planner,qwen_vlm

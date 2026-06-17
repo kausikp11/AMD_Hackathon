@@ -1,0 +1,363 @@
+{
+  "environment": {
+    "VLM_BACKEND": "qwen",
+    "QWEN_VLM_BASE_URL": "http://localhost:8000/v1",
+    "QWEN_VLM_MODEL": "",
+    "LOCATOR_BACKEND": "locate_anything_cpp_http",
+    "LOCATE_ANYTHING_CPP_BIN": "",
+    "LOCATE_ANYTHING_CPP_MODEL": "",
+    "LOCATE_ANYTHING_CPP_MODE": ""
+  },
+  "records": [
+    {
+      "frame_id": "013342",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "HIGH",
+      "action": "SLOW_DOWN",
+      "target_speed": 0.25,
+      "locator_seconds": 4.7682,
+      "pipeline_seconds": 6.6231,
+      "located_count": 4,
+      "pipeline_located_count": 5,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "0",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "0",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638246400"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "28",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "15",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638459392"
+        }
+      }
+    },
+    {
+      "frame_id": "013352",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "CRITICAL",
+      "action": "STOP",
+      "target_speed": 0.0,
+      "locator_seconds": 4.7258,
+      "pipeline_seconds": 2.3925,
+      "located_count": 4,
+      "pipeline_located_count": 5,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "9",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638459392"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "33",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638463488"
+        }
+      }
+    },
+    {
+      "frame_id": "013362",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "LOW",
+      "action": "CONTINUE",
+      "target_speed": 1.0,
+      "locator_seconds": 4.6049,
+      "pipeline_seconds": 1.9846,
+      "located_count": 4,
+      "pipeline_located_count": 4,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "10",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "6",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638463488"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638471680"
+        }
+      }
+    },
+    {
+      "frame_id": "013372",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "LOW",
+      "action": "CONTINUE",
+      "target_speed": 1.0,
+      "locator_seconds": 4.5703,
+      "pipeline_seconds": 2.4388,
+      "located_count": 3,
+      "pipeline_located_count": 4,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "9",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638471680"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638479872"
+        }
+      }
+    },
+    {
+      "frame_id": "013382",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "CRITICAL",
+      "action": "STOP",
+      "target_speed": 0.0,
+      "locator_seconds": 4.6838,
+      "pipeline_seconds": 2.5688,
+      "located_count": 6,
+      "pipeline_located_count": 7,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "10",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638479872"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638488064"
+        }
+      }
+    },
+    {
+      "frame_id": "013392",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "CRITICAL",
+      "action": "STOP",
+      "target_speed": 0.0,
+      "locator_seconds": 5.0267,
+      "pipeline_seconds": 2.5047,
+      "located_count": 3,
+      "pipeline_located_count": 4,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "10",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638488064"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "31",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638496256"
+        }
+      }
+    },
+    {
+      "frame_id": "013402",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "HIGH",
+      "action": "SLOW_DOWN",
+      "target_speed": 0.25,
+      "locator_seconds": 5.0477,
+      "pipeline_seconds": 2.7066,
+      "located_count": 6,
+      "pipeline_located_count": 8,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "9",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638496256"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638504448"
+        }
+      }
+    },
+    {
+      "frame_id": "013412",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "HIGH",
+      "action": "SLOW_DOWN",
+      "target_speed": 0.25,
+      "locator_seconds": 5.0445,
+      "pipeline_seconds": 2.4044,
+      "located_count": 2,
+      "pipeline_located_count": 3,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "10",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638504448"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638508544"
+        }
+      }
+    },
+    {
+      "frame_id": "013422",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "CRITICAL",
+      "action": "STOP",
+      "target_speed": 0.0,
+      "locator_seconds": 4.9435,
+      "pipeline_seconds": 2.4929,
+      "located_count": 2,
+      "pipeline_located_count": 3,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "10",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638508544"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638516736"
+        }
+      }
+    },
+    {
+      "frame_id": "013432",
+      "locator_backend": "locate_anything_cpp_http",
+      "vlm_backend": "qwen",
+      "scene_source": "qwen_vlm",
+      "risk_level": "LOW",
+      "action": "CONTINUE",
+      "target_speed": 1.0,
+      "locator_seconds": 4.9555,
+      "pipeline_seconds": 2.1156,
+      "located_count": 5,
+      "pipeline_located_count": 5,
+      "path_source": "qwen_vlm",
+      "floor_source": "qwen_vlm",
+      "gpu_before": {
+        "card0": {
+          "GPU use (%)": "10",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "5",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638516736"
+        }
+      },
+      "gpu_after": {
+        "card0": {
+          "GPU use (%)": "32",
+          "GPU Memory Allocated (VRAM%)": "84",
+          "GPU Memory Read/Write Activity (%)": "17",
+          "Memory Activity": "N/A",
+          "VRAM Total Memory (B)": "206141652992",
+          "VRAM Total Used Memory (B)": "173638524928"
+        }
+      }
+    }
+  ]
+}
